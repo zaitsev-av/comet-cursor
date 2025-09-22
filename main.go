@@ -16,6 +16,7 @@ CGEventRef mouseMovedCallback(CGEventTapProxy proxy, CGEventType type, CGEventRe
 int isNil(void *p) {
     return p == NULL;
 }
+
 */
 import "C"
 import (
@@ -55,18 +56,55 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 }
 
 func createProgram() (uint32, error) {
+	// Вход: позиция вершины (2D)
+	// Вход: значение прозрачности
+	// Выход: передаем прозрачность в фрагментный шейдер
+	// Преобразуем в 4D позицию (3D + homogeneous)
+	// Передаем прозрачность дальше
 	vertexShaderSrc := `
 	#version 330 core
-	layout (location = 0) in vec2 aPos;
+	layout (location = 0) in vec2 aPos; 
+	layout (location = 1) in float aAlpha;
+	out float vAlpha;
 	void main() {
 		gl_Position = vec4(aPos, 0.0, 1.0);
+		vAlpha = aAlpha;
 	}`
+	//fragmentShaderSrc := `
+	//#version 330 core
+	//in float vAlpha;
+	//out vec4 FragColor;
+	//void main() {
+	//	// Создаем градиент от оранжевого (1.0, 0.4, 0.0) к желтому (1.0, 1.0, 0.2)
+	//	vec3 color = mix(vec3(1.0, 0.4, 0.0), vec3(1.0, 1.0, 0.2), vAlpha);
+	//	// Устанавливаем цвет с прозрачностью (альфа = 80% от входного значения)
+	//	FragColor = vec4(color, vAlpha * 0.8);
+	//}`
 	fragmentShaderSrc := `
-	#version 330 core
-	out vec4 FragColor;
-	void main() {
-		FragColor = vec4(1.0, 0.8, 0.2, 0.7);
-	}`
+#version 330 core
+in float vAlpha;
+out vec4 FragColor;
+
+void main() {
+    // Широкий градиент с нелинейным распределением
+    float gradientFactor = smoothstep(0.0, 1.0, vAlpha);
+    gradientFactor = pow(gradientFactor, 0.3); // Делаем градиент шире
+    
+    vec3 startColor = vec3(0.8, 0.2, 0.0);    // Темно-оранжевый
+    vec3 midColor = vec3(1.0, 0.5, 0.1);       // Средний оранжевый  
+    vec3 endColor = vec3(1.0, 1.0, 0.3);       // Ярко-желтый
+    
+    // Двухэтапный градиент
+    vec3 color;
+    if (gradientFactor < 0.5) {
+        color = mix(startColor, midColor, gradientFactor * 2.0);
+    } else {
+        color = mix(midColor, endColor, (gradientFactor - 0.5) * 2.0);
+    }
+    
+    FragColor = vec4(color, vAlpha * 0.8);
+}
+`
 
 	vs, err := compileShader(vertexShaderSrc+"\x00", gl.VERTEX_SHADER)
 	if err != nil {
@@ -134,9 +172,11 @@ func main() {
 		panic(err)
 	}
 
-	// Настройки для прозрачности
+	// Настройки для прозрачности и линий
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	gl.Enable(gl.LINE_SMOOTH)
+	gl.LineWidth(3.0)
 
 	program, err := createProgram()
 	if err != nil {
@@ -150,26 +190,35 @@ func main() {
 	trail := []point{}
 	lastUpdate := time.Now()
 
+	// Получаем текущую позицию курсора для инициализации
+	trail = append(trail, point{x: float32(coords[0]), y: float32(coords[1])})
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	go func() { <-stop; win.SetShouldClose(true) }()
 
 	for !win.ShouldClose() {
-		// Добавляем точку в хвост
-		if time.Since(lastUpdate) > 16*time.Millisecond {
-			trail = append(trail, point{x: float32(coords[0]), y: float32(coords[1])})
-			if len(trail) > 40 {
-				trail = trail[1:]
+		// Добавляем точку в хвост чаще
+		if time.Since(lastUpdate) > 8*time.Millisecond {
+			newPoint := point{x: float32(coords[0]), y: float32(coords[1])}
+			// Добавляем точку только если курсор двинулся
+			if len(trail) == 0 || (len(trail) > 0 && (newPoint.x != trail[len(trail)-1].x || newPoint.y != trail[len(trail)-1].y)) {
+				trail = append(trail, newPoint)
+				if len(trail) > 60 {
+					trail = trail[1:]
+				}
 			}
 			lastUpdate = time.Now()
 		}
 
-		// Конвертация координат в NDC
+		// Конвертация координат в NDC с альфой
 		verts := []float32{}
-		for _, p := range trail {
+		for i, p := range trail {
 			ndcX := (p.x/float32(mode.Width))*2 - 1
 			ndcY := (1-p.y/float32(mode.Height))*2 - 1
-			verts = append(verts, ndcX, ndcY)
+			// Альфа от 0.1 (старые точки) до 1.0 (новые точки)
+			alpha := 0.1 + 0.9*float32(i)/float32(len(trail)-1)
+			verts = append(verts, ndcX, ndcY, alpha)
 		}
 
 		// Очистка экрана
@@ -181,8 +230,12 @@ func main() {
 			gl.BindVertexArray(vao)
 			gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
 			gl.BufferData(gl.ARRAY_BUFFER, len(verts)*4, gl.Ptr(verts), gl.DYNAMIC_DRAW)
-			gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 0, gl.PtrOffset(0))
+			// Позиция (x, y)
+			gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 3*4, gl.PtrOffset(0))
 			gl.EnableVertexAttribArray(0)
+			// Альфа (прозрачность)
+			gl.VertexAttribPointer(1, 1, gl.FLOAT, false, 3*4, gl.PtrOffset(2*4))
+			gl.EnableVertexAttribArray(1)
 
 			gl.UseProgram(program)
 			gl.DrawArrays(gl.LINE_STRIP, 0, int32(len(trail)))
