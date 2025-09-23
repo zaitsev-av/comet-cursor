@@ -1,8 +1,10 @@
 package main
 
 /*
-#cgo LDFLAGS: -framework ApplicationServices
+#cgo LDFLAGS: -framework ApplicationServices -framework Foundation -lobjc
 #include <ApplicationServices/ApplicationServices.h>
+#include <objc/runtime.h>
+#include <objc/message.h>
 
 CGEventRef mouseMovedCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *userInfo) {
     if (type == kCGEventMouseMoved || type == kCGEventLeftMouseDragged || type == kCGEventRightMouseDragged) {
@@ -25,10 +27,21 @@ CGPoint getCurrentMousePosition() {
     return cursor;
 }
 
+// Функция для настройки прозрачности окна через Objective-C runtime
+void makeWindowClickThrough(void* windowPtr) {
+    // Получаем класс NSWindow и селектор setIgnoresMouseEvents:
+    Class nsWindowClass = objc_getClass("NSWindow");
+    SEL setIgnoresMouseEventsSelector = sel_registerName("setIgnoresMouseEvents:");
+
+    // Вызываем [window setIgnoresMouseEvents:YES]
+    ((void (*)(id, SEL, BOOL))objc_msgSend)((id)windowPtr, setIgnoresMouseEventsSelector, 1);
+}
+
 */
 import "C"
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"runtime"
@@ -42,6 +55,13 @@ import (
 type point struct{ x, y float32 }
 
 func init() { runtime.LockOSThread() }
+
+// Функция для вычисления расстояния между двумя точками
+func distance(x1, y1, x2, y2 float64) float64 {
+	dx := x1 - x2
+	dy := y1 - y2
+	return math.Sqrt(dx*dx + dy*dy)
+}
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
@@ -177,6 +197,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Делаем окно прозрачным для кликов мыши через Objective-C runtime, без этого не можем кликать и совершать действия
+	nsWindow := win.GetCocoaWindow()
+	C.makeWindowClickThrough(nsWindow)
+
 	win.MakeContextCurrent()
 	glfw.SwapInterval(1)
 
@@ -222,32 +247,40 @@ func main() {
 		pos := C.getCurrentMousePosition()
 		coords[0] = pos.x
 		coords[1] = pos.y
-		currentPoint := point{x: float32(coords[0]), y: float32(coords[1])}
+		currentPoint := point{x: float32(coords[0] + 5), y: float32(coords[1] - 20)}
 
-		// КРИТИЧНО: Добавляем текущую позицию курсора каждый кадр (60 FPS)
-		// Это гарантирует, что хвост ВСЕГДА начинается от курсора без пробелов
 		trail = append(trail, currentPoint)
-		if len(trail) > 30 { // Уменьшим для более короткого хвоста
+		if len(trail) > 80 { // Уменьшим для более короткого хвоста
 			trail = trail[1:]
 		}
-
-		// Отладочная информация временно отключена для визуальной оценки
+		// Отладочная информация
 		frameCounter++
+		if len(trail) > 0 {
+			headPos := trail[len(trail)-1] // Голова кометы (последняя точка)
+			dist := distance(float64(coords[0]), float64(coords[1]), float64(headPos.x), float64(headPos.y))
+			//todo сделать этот лог только в режиме дебага
+			//логи каждую секунду
+			if frameCounter%60 == 0 {
+				fmt.Printf("DEBUG: Frame %d | Курсор: (%.1f, %.1f) | Голова: (%.1f, %.1f) | Расстояние: %.1f | Хвост: %d точек\n",
+					frameCounter,
+					float64(coords[0]), float64(coords[1]),
+					float64(headPos.x), float64(headPos.y),
+					dist, len(trail))
+			}
+		}
 
 		// Конвертация координат в NDC с альфой
 		verts := []float32{}
 		for i, p := range trail {
 			ndcX := (p.x/float32(mode.Width))*2 - 1
 			ndcY := (1-p.y/float32(mode.Height))*2 - 1
-			// Правильный градиент - последняя точка (у курсора) самая яркая
 			var alpha float32
 			if len(trail) == 1 {
 				alpha = 1.0
 			} else {
 				// Прямой прогресс - последняя точка имеет alpha = 1.0 (самая яркая)
 				progress := float32(i) / float32(len(trail)-1)
-				// Экспоненциальная функция для более широкого градиента
-				alpha = 0.05 + 0.95*progress*progress*progress
+				alpha = 0.3 + 0.7*progress
 			}
 			verts = append(verts, ndcX, ndcY, alpha)
 		}
