@@ -17,6 +17,14 @@ int isNil(void *p) {
     return p == NULL;
 }
 
+// Функция для получения текущей позиции курсора
+CGPoint getCurrentMousePosition() {
+    CGEventRef event = CGEventCreate(NULL);
+    CGPoint cursor = CGEventGetLocation(event);
+    CFRelease(event);
+    return cursor;
+}
+
 */
 import "C"
 import (
@@ -25,7 +33,6 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -86,23 +93,28 @@ in float vAlpha;
 out vec4 FragColor;
 
 void main() {
-    // Широкий градиент с нелинейным распределением
+    // Очень широкий и плавный градиент
     float gradientFactor = smoothstep(0.0, 1.0, vAlpha);
-    gradientFactor = pow(gradientFactor, 0.3); // Делаем градиент шире
+    gradientFactor = pow(gradientFactor, 0.15); // Делаем градиент намного шире
     
-    vec3 startColor = vec3(0.8, 0.2, 0.0);    // Темно-оранжевый
-    vec3 midColor = vec3(1.0, 0.5, 0.1);       // Средний оранжевый  
-    vec3 endColor = vec3(1.0, 1.0, 0.3);       // Ярко-желтый
+    // Правильные цвета - яркий цвет для курсора (высокий alpha)
+    vec3 startColor = vec3(0.6, 0.1, 0.0);      // Очень темно-оранжевый (для конца хвоста)
+    vec3 earlyColor = vec3(0.9, 0.3, 0.0);      // Темно-оранжевый
+    vec3 midColor = vec3(1.0, 0.6, 0.1);        // Яркий оранжевый  
+    vec3 endColor = vec3(1.0, 1.0, 0.4);        // Ярко-желтый (для курсора)
     
-    // Двухэтапный градиент
+    // Трехэтапный градиент для более плавного перехода
     vec3 color;
-    if (gradientFactor < 0.5) {
-        color = mix(startColor, midColor, gradientFactor * 2.0);
+    if (gradientFactor < 0.33) {
+        color = mix(startColor, earlyColor, gradientFactor * 3.0);
+    } else if (gradientFactor < 0.66) {
+        color = mix(earlyColor, midColor, (gradientFactor - 0.33) * 3.0);
     } else {
-        color = mix(midColor, endColor, (gradientFactor - 0.5) * 2.0);
+        color = mix(midColor, endColor, (gradientFactor - 0.66) * 3.0);
     }
     
-    FragColor = vec4(color, vAlpha * 0.8);
+    // Более мягкая прозрачность
+    FragColor = vec4(color, vAlpha * 0.9);
 }
 `
 
@@ -176,7 +188,7 @@ func main() {
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 	gl.Enable(gl.LINE_SMOOTH)
-	gl.LineWidth(3.0)
+	gl.LineWidth(2.0) // Временно уменьшаем для диагностики
 
 	program, err := createProgram()
 	if err != nil {
@@ -188,36 +200,55 @@ func main() {
 	gl.GenBuffers(1, &vbo)
 
 	trail := []point{}
-	lastUpdate := time.Now()
 
-	// Получаем текущую позицию курсора для инициализации
-	trail = append(trail, point{x: float32(coords[0]), y: float32(coords[1])})
+	// Получаем текущую позицию курсора для правильной инициализации
+	pos := C.getCurrentMousePosition()
+	coords[0] = pos.x
+	coords[1] = pos.y
+	initialPoint := point{x: float32(coords[0]), y: float32(coords[1])}
+
+	// Добавляем несколько точек в одном месте для плавного начала
+	for i := 0; i < 5; i++ {
+		trail = append(trail, initialPoint)
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	go func() { <-stop; win.SetShouldClose(true) }()
 
+	frameCounter := 0
 	for !win.ShouldClose() {
-		// Добавляем точку в хвост чаще
-		if time.Since(lastUpdate) > 8*time.Millisecond {
-			newPoint := point{x: float32(coords[0]), y: float32(coords[1])}
-			// Добавляем точку только если курсор двинулся
-			if len(trail) == 0 || (len(trail) > 0 && (newPoint.x != trail[len(trail)-1].x || newPoint.y != trail[len(trail)-1].y)) {
-				trail = append(trail, newPoint)
-				if len(trail) > 60 {
-					trail = trail[1:]
-				}
-			}
-			lastUpdate = time.Now()
+		// Обновляем координаты курсора на каждом кадре для точности
+		pos := C.getCurrentMousePosition()
+		coords[0] = pos.x
+		coords[1] = pos.y
+		currentPoint := point{x: float32(coords[0]), y: float32(coords[1])}
+
+		// КРИТИЧНО: Добавляем текущую позицию курсора каждый кадр (60 FPS)
+		// Это гарантирует, что хвост ВСЕГДА начинается от курсора без пробелов
+		trail = append(trail, currentPoint)
+		if len(trail) > 30 { // Уменьшим для более короткого хвоста
+			trail = trail[1:]
 		}
+
+		// Отладочная информация временно отключена для визуальной оценки
+		frameCounter++
 
 		// Конвертация координат в NDC с альфой
 		verts := []float32{}
 		for i, p := range trail {
 			ndcX := (p.x/float32(mode.Width))*2 - 1
 			ndcY := (1-p.y/float32(mode.Height))*2 - 1
-			// Альфа от 0.1 (старые точки) до 1.0 (новые точки)
-			alpha := 0.1 + 0.9*float32(i)/float32(len(trail)-1)
+			// Правильный градиент - последняя точка (у курсора) самая яркая
+			var alpha float32
+			if len(trail) == 1 {
+				alpha = 1.0
+			} else {
+				// Прямой прогресс - последняя точка имеет alpha = 1.0 (самая яркая)
+				progress := float32(i) / float32(len(trail)-1)
+				// Экспоненциальная функция для более широкого градиента
+				alpha = 0.05 + 0.95*progress*progress*progress
+			}
 			verts = append(verts, ndcX, ndcY, alpha)
 		}
 
