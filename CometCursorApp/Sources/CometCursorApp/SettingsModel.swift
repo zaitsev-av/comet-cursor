@@ -26,7 +26,7 @@ class SettingsModel: ObservableObject {
     init() {
         isEnabled  = ud.boolOrDefault(key: "isEnabled",   default: true)
         trailLength = ud.doubleOrDefault(key: "trailLength", default: 80)
-        lineWidth  = ud.doubleOrDefault(key: "lineWidth",   default: 30)
+        lineWidth  = ud.doubleOrDefault(key: "lineWidth",   default: 12)
         fadeSpeed  = ud.doubleOrDefault(key: "fadeSpeed",   default: 0.015)
         tailColor  = loadColor(key: "tailColor")  ?? NSColor(red: 0.6, green: 0.1, blue: 0.0, alpha: 1)
         headColor  = loadColor(key: "headColor")  ?? NSColor(red: 1.0, green: 1.0, blue: 0.4, alpha: 1)

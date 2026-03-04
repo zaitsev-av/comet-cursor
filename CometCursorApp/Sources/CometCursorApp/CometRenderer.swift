@@ -182,44 +182,49 @@ final class CometRenderer: NSObject, MTKViewDelegate {
 
     // MARK: - Vertex generation
 
-    /// Разворачивает хвост из точек в набор треугольников (2 на сегмент).
-    /// Ширина линии задана в логических пикселях экрана.
-    private func buildVertices(points: [SIMD2<Float>], fadeAlpha: Float) -> [Vertex] {
+    /// Строит непрерывную ленту (triangle strip): каждая точка хвоста
+    /// даёт пару вершин (левая/правая), соседние сегменты разделяют вершины —
+    /// никаких разрывов в стыках при изменении направления.
+    private func buildRibbonVertices(points: [SIMD2<Float>], fadeAlpha: Float) -> [Vertex] {
         guard points.count >= 2 else { return [] }
 
         let halfW = Float(settings.lineWidth) / 2
-        let sw = Float(screen.frame.width)
-        let sh = Float(screen.frame.height)
+        let sw    = Float(screen.frame.width)
+        let sh    = Float(screen.frame.height)
+        let ndcPts = points.map { toNDC($0) }
+
+        /// Перпендикуляр к вектору (a→b) в NDC, длиной halfW логических пикселей.
+        func perp(from a: SIMD2<Float>, to b: SIMD2<Float>) -> SIMD2<Float> {
+            let dxPx = (b.x - a.x) * sw / 2
+            let dyPx = (b.y - a.y) * sh / 2
+            let len  = sqrt(dxPx * dxPx + dyPx * dyPx)
+            guard len > 0.001 else { return SIMD2(0, halfW / (sh / 2)) }
+            return SIMD2(
+                (-dyPx / len) * halfW / (sw / 2),
+                ( dxPx / len) * halfW / (sh / 2)
+            )
+        }
 
         var verts: [Vertex] = []
-        verts.reserveCapacity((points.count - 1) * 6)
+        verts.reserveCapacity(ndcPts.count * 2)
 
-        for i in 0..<points.count - 1 {
-            let n1 = toNDC(points[i])
-            let n2 = toNDC(points[i + 1])
+        for i in 0..<ndcPts.count {
+            let progress = Float(i) / Float(ndcPts.count - 1)
+            let alpha    = (0.3 + 0.7 * progress) * fadeAlpha
+            let p        = ndcPts[i]
 
-            let prog1 = Float(i)     / Float(points.count - 1)
-            let prog2 = Float(i + 1) / Float(points.count - 1)
-            let a1 = (0.3 + 0.7 * prog1) * fadeAlpha
-            let a2 = (0.3 + 0.7 * prog2) * fadeAlpha
+            // Касательная — хорда через соседние точки → гладкий стык без разрыва
+            let tangentPerp: SIMD2<Float>
+            if i == 0 {
+                tangentPerp = perp(from: ndcPts[0], to: ndcPts[1])
+            } else if i == ndcPts.count - 1 {
+                tangentPerp = perp(from: ndcPts[i - 1], to: ndcPts[i])
+            } else {
+                tangentPerp = perp(from: ndcPts[i - 1], to: ndcPts[i + 1])
+            }
 
-            // Направление в пространстве пикселей (для корректного перпендикуляра)
-            let dxPx = (n2.x - n1.x) * sw / 2
-            let dyPx = (n2.y - n1.y) * sh / 2
-            let len = sqrt(dxPx * dxPx + dyPx * dyPx)
-            guard len > 0.01 else { continue }
-
-            // Перпендикуляр в пространстве пикселей → NDC
-            let perpNDCX = (-dyPx / len) * halfW / (sw / 2)
-            let perpNDCY = ( dxPx / len) * halfW / (sh / 2)
-            let perp = SIMD2<Float>(perpNDCX, perpNDCY)
-
-            let v0 = Vertex(position: n1 - perp, alpha: a1, edge: -1)
-            let v1 = Vertex(position: n1 + perp, alpha: a1, edge: +1)
-            let v2 = Vertex(position: n2 - perp, alpha: a2, edge: -1)
-            let v3 = Vertex(position: n2 + perp, alpha: a2, edge: +1)
-
-            verts.append(contentsOf: [v0, v1, v2, v1, v3, v2])
+            verts.append(Vertex(position: p - tangentPerp, alpha: alpha, edge: -1))
+            verts.append(Vertex(position: p + tangentPerp, alpha: alpha, edge: +1))
         }
 
         return verts
@@ -248,7 +253,7 @@ final class CometRenderer: NSObject, MTKViewDelegate {
         }
 
         let (points, fadeAlpha) = trailManager.snapshot()
-        let verts = buildVertices(points: points, fadeAlpha: fadeAlpha)
+        let verts = buildRibbonVertices(points: points, fadeAlpha: fadeAlpha)
 
         if !verts.isEmpty, let buf = device.makeBuffer(
             bytes: verts,
@@ -263,7 +268,8 @@ final class CometRenderer: NSObject, MTKViewDelegate {
             encoder.setRenderPipelineState(pipelineState)
             encoder.setVertexBuffer(buf, offset: 0, index: 0)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: verts.count)
+            // triangleStrip: соседние точки разделяют вершины — лента без разрывов
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: verts.count)
         }
 
         encoder.endEncoding()
