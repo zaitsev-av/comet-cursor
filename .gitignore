@@ -1,1 +1,17 @@
-.idea
+# IDE
+.idea/
+.vscode/
+*.xcuserstate
+xcuserdata/
+
+# Go
+comet-cursor
+.comet-cursor.pid
+
+# Swift / SPM
+CometCursorApp/.build/
+CometCursorApp/*.app/
+CometCursorApp/.swiftpm/
+
+# macOS
+.DS_Store
