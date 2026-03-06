@@ -9,7 +9,15 @@ final class TrailManager {
     private var lock = NSLock()
     private var points: [SIMD2<Float>] = []
     private var fadeAlpha: Float = 1.0
-    private var movedThisFrame = false
+    private var lastTickTime: TimeInterval?
+
+    // Timestamp последнего движения мыши.
+    // Timestamp-подход надёжнее булевого флага:
+    // флаг может быть сброшен render-потоком раньше, чем main-поток его взводит.
+    private var lastMoveTime: TimeInterval = 0
+
+    // Пауза перед началом затухания (секунды неподвижности мыши).
+    private let fadeDelay: TimeInterval = 0.4
 
     // MARK: - Main thread
 
@@ -17,11 +25,18 @@ final class TrailManager {
         lock.lock()
         defer { lock.unlock() }
 
+        // Всегда обновляем время и alpha, даже если точка не добавляется —
+        // это предотвращает fade при медленном движении (d < 1 px между событиями).
+        let now = ProcessInfo.processInfo.systemUptime
+        lastMoveTime = now
+        lastTickTime = now
+        fadeAlpha = 1.0
+
         let newPos = SIMD2<Float>(x, y)
 
         if let last = points.last {
             let d = simd_length(newPos - last)
-            guard d > 1 else { return }   // мышь стоит — fade происходит в tick()
+            guard d > 1 else { return }  // не добавляем дублирующую точку
 
             // Линейная интерполяция при быстром движении
             if d > 10 {
@@ -34,8 +49,6 @@ final class TrailManager {
         }
 
         points.append(newPos)
-        fadeAlpha = 1.0
-        movedThisFrame = true
 
         if points.count > maxLength {
             points.removeFirst(points.count - maxLength)
@@ -47,26 +60,31 @@ final class TrailManager {
         defer { lock.unlock() }
         points.removeAll()
         fadeAlpha = 0
-        movedThisFrame = false
+        lastMoveTime = 0
+        lastTickTime = nil
     }
 
     // MARK: - Render thread
 
-    /// Вызывается раз в кадр основным рендерером. Уменьшает fadeAlpha когда мышь стоит.
+    /// Вызывается раз в кадр основным рендерером.
+    /// fadeSpeed задаётся как "альфа в секунду", а не "альфа за кадр".
     func tick(fadeSpeed: Float) {
         lock.lock()
         defer { lock.unlock() }
 
-        if movedThisFrame {
-            movedThisFrame = false
-            return
-        }
+        let now = ProcessInfo.processInfo.systemUptime
+        let dt = max(0, now - (lastTickTime ?? now))
+        lastTickTime = now
 
         guard !points.isEmpty else { return }
 
-        fadeAlpha = max(0, fadeAlpha - fadeSpeed)
-        if fadeAlpha <= 0 {
-            points.removeAll()
+        let elapsed = now - lastMoveTime
+        if elapsed < fadeDelay {
+            // Мышь двигалась недавно — держим полную яркость
+            fadeAlpha = 1.0
+        } else {
+            fadeAlpha = max(0, fadeAlpha - fadeSpeed * Float(dt))
+            if fadeAlpha <= 0 { points.removeAll() }
         }
     }
 

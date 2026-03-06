@@ -16,7 +16,7 @@ struct SettingsView: View {
                     Text("\(Int(settings.lineWidth)) px").monoframe(45)
                 }
                 labeled("Затухание") {
-                    Slider(value: $settings.fadeSpeed, in: 0.003...0.05)
+                    Slider(value: $settings.fadeSpeed, in: 0.2...3.0)
                     Text(fadeLabel).monoframe(60)
                 }
             }
@@ -47,8 +47,8 @@ struct SettingsView: View {
 
     private var fadeLabel: String {
         switch settings.fadeSpeed {
-        case ..<0.008:  return "медленно"
-        case ..<0.025:  return "средне"
+        case ..<0.7:  return "медленно"
+        case ..<1.6:  return "средне"
         default:        return "быстро"
         }
     }

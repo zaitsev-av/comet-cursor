@@ -75,11 +75,12 @@ final class CometRenderer: NSObject, MTKViewDelegate {
     private let trailManager: TrailManager
     private let isPrimary: Bool
 
-    private let window: NSWindow
+    private let window: NSPanel
     private let mtkView: MTKView
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private var pipelineState: MTLRenderPipelineState!
+    private var keepAliveTimer: Timer?
 
     // Высота основного экрана для конвертации CGEvent Y↓ → AppKit Y↑
     private let primaryHeight: CGFloat
@@ -90,27 +91,33 @@ final class CometRenderer: NSObject, MTKViewDelegate {
         self.trailManager = trailManager
         self.isPrimary = isPrimary
 
-        primaryHeight = NSScreen.screens.first { $0.frame.origin == .zero }?.frame.height
-            ?? NSScreen.main?.frame.height
+        // Основной экран всегда имеет origin (0,0) в AppKit-координатах.
+        // NSScreen.main для .accessory-приложений без окон с фокусом возвращает nil,
+        // поэтому ищем экран по origin (0,0) напрямую.
+        primaryHeight = NSScreen.screens.first(where: { $0.frame.minX == 0 && $0.frame.minY == 0 })?.frame.height
             ?? screen.frame.height
 
         device = MTLCreateSystemDefaultDevice()!
         commandQueue = device.makeCommandQueue()!
 
-        // Прозрачное окно-оверлей, покрывающее весь экран
-        window = NSWindow(
-            contentRect: screen.frame,
-            styleMask: .borderless,
+        // NSPanel с .nonactivatingPanel — правильный тип для прозрачных оверлеев:
+        // не скрывается при деактивации приложения, не перехватывает фокус клавиатуры.
+        window = NSPanel(
+            contentRect: CGRect(origin: .zero, size: screen.frame.size),
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
+        window.setFrame(screen.frame, display: false)
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
-        window.level = .screenSaver
+        // Screen saver level надёжнее держит overlay поверх обычных окон/space-переходов.
+        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)))
         window.ignoresMouseEvents = true
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        window.hidesOnDeactivate = false
+        window.isFloatingPanel = true
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
 
         // MTKView на весь контент-фрейм окна
         let viewFrame = CGRect(origin: .zero, size: screen.frame.size)
@@ -132,9 +139,33 @@ final class CometRenderer: NSObject, MTKViewDelegate {
 
         super.init()
 
-        mtkView.delegate = self
+        // Pipeline должен быть готов до того, как MTKView начнёт вызывать draw(in:)
         setupPipeline()
-        window.orderFront(nil)
+        mtkView.delegate = self
+        // orderFrontRegardless показывает окно даже когда приложение неактивно (.accessory policy)
+        window.orderFrontRegardless()
+
+        // Страховочный таймер: восстанавливает рендер и видимость окна если App Nap
+        // или window server их прервали. Работает независимо от draw loop.
+        keepAliveTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            if self.mtkView.isPaused { self.mtkView.isPaused = false }
+            // isVisible не означает "поверх всех окон", поэтому фронтим регулярно.
+            self.window.orderFrontRegardless()
+        }
+    }
+
+    func orderFront() {
+        window.orderFrontRegardless()
+    }
+
+    func shutdown() {
+        keepAliveTimer?.invalidate()
+        keepAliveTimer = nil
+        mtkView.delegate = nil
+        mtkView.isPaused = true
+        window.orderOut(nil)
+        window.close()
     }
 
     // MARK: - Pipeline
