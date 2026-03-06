@@ -15,6 +15,7 @@ private struct Vertex {
 private struct Uniforms {
     var tailColor: SIMD4<Float>
     var headColor: SIMD4<Float>
+    var opacity: Float
 }
 
 // Шейдеры компилируются в рантайме из строки,
@@ -38,6 +39,7 @@ struct FragIn {
 struct Uniforms {
     float4 tailColor;
     float4 headColor;
+    float  opacity;
 };
 
 vertex FragIn vertex_main(
@@ -63,7 +65,7 @@ fragment float4 fragment_main(
     float t = pow(smoothstep(0.0, 1.0, in.alpha), 0.15);
     float3 color = mix(u.tailColor.rgb, u.headColor.rgb, t);
 
-    float alpha = in.alpha * edgeFalloff * 0.92;
+    float alpha = in.alpha * edgeFalloff * u.opacity;
     return float4(color, alpha);
 }
 """#
@@ -268,7 +270,7 @@ final class CometRenderer: NSObject, MTKViewDelegate {
     func draw(in view: MTKView) {
         // Только основной рендерер тикает затухание (избегаем N-кратного уменьшения)
         if isPrimary {
-            trailManager.tick(fadeSpeed: Float(settings.fadeSpeed))
+            trailManager.tick(fadeSpeed: Float(settings.fadeSpeed), fadeDelay: settings.fadeDelay)
         }
 
         guard let drawable   = view.currentDrawable,
@@ -293,7 +295,8 @@ final class CometRenderer: NSObject, MTKViewDelegate {
         ) {
             var uniforms = Uniforms(
                 tailColor: settings.tailColorSIMD,
-                headColor: settings.headColorSIMD
+                headColor: settings.headColorSIMD,
+                opacity: Float(settings.opacity)
             )
 
             encoder.setRenderPipelineState(pipelineState)

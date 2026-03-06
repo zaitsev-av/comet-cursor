@@ -16,6 +16,12 @@ class SettingsModel: ObservableObject {
     @Published var fadeSpeed: Double {
         didSet { UserDefaults.standard.set(fadeSpeed, forKey: "fadeSpeed") }
     }
+    @Published var opacity: Double {
+        didSet { UserDefaults.standard.set(opacity, forKey: "opacity") }
+    }
+    @Published var fadeDelay: Double {
+        didSet { UserDefaults.standard.set(fadeDelay, forKey: "fadeDelay") }
+    }
     @Published var tailColor: NSColor {
         didSet { saveColor(tailColor, key: "tailColor") }
     }
@@ -24,15 +30,17 @@ class SettingsModel: ObservableObject {
     }
 
     init() {
-        isEnabled  = ud.boolOrDefault(key: "isEnabled",   default: true)
+        isEnabled   = ud.boolOrDefault(key: "isEnabled",    default: true)
         trailLength = ud.doubleOrDefault(key: "trailLength", default: 80)
-        lineWidth  = ud.doubleOrDefault(key: "lineWidth",   default: 12)
+        lineWidth   = ud.doubleOrDefault(key: "lineWidth",   default: 12)
         let rawFadeSpeed = ud.doubleOrDefault(key: "fadeSpeed", default: 0.9)
         // Миграция legacy-значений: раньше fadeSpeed хранился "за кадр",
         // теперь это "в секунду". Малые значения считаем legacy.
-        fadeSpeed = rawFadeSpeed < 0.1 ? rawFadeSpeed * 60 : rawFadeSpeed
-        tailColor  = loadColor(key: "tailColor")  ?? NSColor(red: 0.6, green: 0.1, blue: 0.0, alpha: 1)
-        headColor  = loadColor(key: "headColor")  ?? NSColor(red: 1.0, green: 1.0, blue: 0.4, alpha: 1)
+        fadeSpeed   = rawFadeSpeed < 0.1 ? rawFadeSpeed * 60 : rawFadeSpeed
+        opacity     = ud.doubleOrDefault(key: "opacity",     default: 0.92)
+        fadeDelay   = ud.doubleOrDefault(key: "fadeDelay",   default: 0.4)
+        tailColor   = loadColor(key: "tailColor") ?? NSColor(red: 0.6, green: 0.1, blue: 0.0, alpha: 1)
+        headColor   = loadColor(key: "headColor") ?? NSColor(red: 1.0, green: 1.0, blue: 0.4, alpha: 1)
     }
 
     var tailColorSIMD: SIMD4<Float> { simd(tailColor) }

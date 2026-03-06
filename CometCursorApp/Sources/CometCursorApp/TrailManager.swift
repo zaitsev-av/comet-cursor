@@ -16,8 +16,7 @@ final class TrailManager {
     // флаг может быть сброшен render-потоком раньше, чем main-поток его взводит.
     private var lastMoveTime: TimeInterval = 0
 
-    // Пауза перед началом затухания (секунды неподвижности мыши).
-    private let fadeDelay: TimeInterval = 0.4
+    // Пауза перед началом затухания — задаётся из настроек через tick().
 
     // MARK: - Main thread
 
@@ -67,8 +66,8 @@ final class TrailManager {
     // MARK: - Render thread
 
     /// Вызывается раз в кадр основным рендерером.
-    /// fadeSpeed задаётся как "альфа в секунду", а не "альфа за кадр".
-    func tick(fadeSpeed: Float) {
+    /// fadeSpeed — "альфа в секунду"; fadeDelay — пауза неподвижности перед затуханием.
+    func tick(fadeSpeed: Float, fadeDelay: TimeInterval) {
         lock.lock()
         defer { lock.unlock() }
 

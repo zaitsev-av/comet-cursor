@@ -71,11 +71,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         if settingsWindow == nil {
-            let controller = NSHostingController(rootView: SettingsView(settings: settings))
+            let view = SettingsView(settings: settings)
+            let controller = NSHostingController(rootView: view)
+            controller.view.frame = CGRect(x: 0, y: 0, width: 400, height: 420)
             let win = NSWindow(contentViewController: controller)
             win.title = "Comet Cursor — Настройки"
             win.styleMask = [.titled, .closable]
             win.isReleasedWhenClosed = false
+            win.setContentSize(CGSize(width: 400, height: 420))
             win.center()
             settingsWindow = win
         }
