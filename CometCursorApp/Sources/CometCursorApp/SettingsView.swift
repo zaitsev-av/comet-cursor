@@ -4,37 +4,48 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject var settings: SettingsModel
 
+    private var l: L10n { settings.l10n }
+
     var body: some View {
         Form {
-            Section("Хвост") {
-                labeled("Длина") {
+            Section(l.sectionTrail) {
+                labeled(l.labelLength) {
                     Slider(value: $settings.trailLength, in: 20...200, step: 1)
                     Text("\(Int(settings.trailLength))").monoframe(35)
                 }
-                labeled("Толщина") {
+                labeled(l.labelWidth) {
                     Slider(value: $settings.lineWidth, in: 2...80, step: 1)
                     Text("\(Int(settings.lineWidth)) px").monoframe(45)
                 }
-                labeled("Прозрачность") {
+                labeled(l.labelOpacity) {
                     Slider(value: $settings.opacity, in: 0.1...1.0)
                     Text("\(Int(settings.opacity * 100))%").monoframe(45)
                 }
             }
 
-            Section("Затухание") {
-                labeled("Скорость") {
+            Section(l.sectionFade) {
+                labeled(l.labelSpeed) {
                     Slider(value: $settings.fadeSpeed, in: 0.2...3.0)
-                    Text(fadeLabel).monoframe(60)
+                    Text(l.fadeSpeedLabel(settings.fadeSpeed)).monoframe(60)
                 }
-                labeled("Задержка") {
+                labeled(l.labelDelay) {
                     Slider(value: $settings.fadeDelay, in: 0.0...2.0)
-                    Text(delayLabel).monoframe(60)
+                    Text(l.fadeDelayLabel(settings.fadeDelay)).monoframe(60)
                 }
             }
 
-            Section("Цвета") {
-                ColorPicker("Цвет хвоста", selection: tailColorBinding)
-                ColorPicker("Цвет головы", selection: headColorBinding)
+            Section(l.sectionColors) {
+                ColorPicker(l.labelTailColor, selection: tailColorBinding)
+                ColorPicker(l.labelHeadColor, selection: headColorBinding)
+            }
+
+            Section(l.sectionApp) {
+                Picker(l.labelLanguage, selection: $settings.language) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
         }
         .formStyle(.grouped)
@@ -56,26 +67,10 @@ struct SettingsView: View {
         )
     }
 
-    private var fadeLabel: String {
-        switch settings.fadeSpeed {
-        case ..<0.7:  return "медленно"
-        case ..<1.6:  return "средне"
-        default:      return "быстро"
-        }
-    }
-
-    private var delayLabel: String {
-        switch settings.fadeDelay {
-        case ..<0.15: return "сразу"
-        case ..<0.7:  return "\(String(format: "%.1f", settings.fadeDelay)) с"
-        default:      return "\(String(format: "%.1f", settings.fadeDelay)) с"
-        }
-    }
-
     @ViewBuilder
     private func labeled<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack {
-            Text(label).frame(width: 80, alignment: .leading)
+            Text(label).frame(width: 90, alignment: .leading)
             content()
         }
     }

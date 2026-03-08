@@ -4,6 +4,11 @@ import simd
 
 class SettingsModel: ObservableObject {
 
+    @Published var language: AppLanguage {
+        didSet { UserDefaults.standard.set(language.rawValue, forKey: "language") }
+    }
+    var l10n: L10n { L10n(lang: language) }
+
     @Published var isEnabled: Bool {
         didSet { UserDefaults.standard.set(isEnabled, forKey: "isEnabled") }
     }
@@ -30,6 +35,8 @@ class SettingsModel: ObservableObject {
     }
 
     init() {
+        let rawLang = ud.string(forKey: "language") ?? AppLanguage.en.rawValue
+        language    = AppLanguage(rawValue: rawLang) ?? .en
         isEnabled   = ud.boolOrDefault(key: "isEnabled",    default: true)
         trailLength = ud.doubleOrDefault(key: "trailLength", default: 80)
         lineWidth   = ud.doubleOrDefault(key: "lineWidth",   default: 12)

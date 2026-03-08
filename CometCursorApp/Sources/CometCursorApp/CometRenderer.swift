@@ -302,7 +302,7 @@ final class CometRenderer: NSObject, MTKViewDelegate {
             encoder.setRenderPipelineState(pipelineState)
             encoder.setVertexBuffer(buf, offset: 0, index: 0)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
-            // triangleStrip: соседние точки разделяют вершины — лента без разрывов
+            // triangleStrip: соседние точки разделяют вершины - лента без разрывов
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: verts.count)
         }
 

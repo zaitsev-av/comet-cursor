@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -10,9 +11,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var renderers: [CometRenderer] = []
     private var settingsWindow: NSWindow?
     private var toggleMenuItem: NSMenuItem?
+    private var settingsMenuItem: NSMenuItem?
+    private var quitMenuItem: NSMenuItem?
     private var workspaceObserverTokens: [NSObjectProtocol] = []
     private var appObserverTokens: [NSObjectProtocol] = []
     private var zOrderEnforcerTimer: Timer?
+    private var languageCancellable: AnyCancellable?
 
     // Предотвращаем App Nap - macOS иначе останавливает render loop когда приложение неактивно
     private var renderActivity: NSObjectProtocol?
@@ -37,6 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startZOrderEnforcer()
         startTracking()
         subscribeToWorkspaceEvents()
+        languageCancellable = settings.$language
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateMenuTitles() }
     }
 
     // MARK: - Status bar
@@ -50,15 +58,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
-        let toggle = NSMenuItem(title: "Включён", action: #selector(toggleEnabled), keyEquivalent: "")
+        let l = settings.l10n
+
+        let toggle = NSMenuItem(title: l.menuEnabled, action: #selector(toggleEnabled), keyEquivalent: "")
         toggle.state = settings.isEnabled ? .on : .off
         menu.addItem(toggle)
         toggleMenuItem = toggle
 
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Настройки…", action: #selector(openSettings), keyEquivalent: ","))
+        let settingsItem = NSMenuItem(title: l.menuSettings, action: #selector(openSettings), keyEquivalent: ",")
+        menu.addItem(settingsItem)
+        settingsMenuItem = settingsItem
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Выйти", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: l.menuQuit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quitItem)
+        quitMenuItem = quitItem
 
         statusItem.menu = menu
     }
@@ -75,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let controller = NSHostingController(rootView: view)
             controller.view.frame = CGRect(x: 0, y: 0, width: 400, height: 420)
             let win = NSWindow(contentViewController: controller)
-            win.title = "Comet Cursor — Настройки"
+            win.title = settings.l10n.windowTitle
             win.styleMask = [.titled, .closable]
             win.isReleasedWhenClosed = false
             win.setContentSize(CGSize(width: 400, height: 420))
@@ -84,6 +98,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func updateMenuTitles() {
+        let l = settings.l10n
+        toggleMenuItem?.title   = l.menuEnabled
+        settingsMenuItem?.title = l.menuSettings
+        quitMenuItem?.title     = l.menuQuit
+        settingsWindow?.title   = l.windowTitle
     }
 
     // MARK: - Renderers
