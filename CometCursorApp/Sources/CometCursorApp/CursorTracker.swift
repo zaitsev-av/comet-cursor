@@ -106,13 +106,22 @@ final class CursorTracker {
         onMove?(loc.x, loc.y)
     }
 
+    var onAccessibilityDenied: (() -> Void)?
+
     private func showAccessibilityError() {
+        // Primary flow: onboarding intercepts this before app starts.
+        // This fallback fires only if permission is revoked while the app is running.
+        if let handler = onAccessibilityDenied {
+            DispatchQueue.main.async { handler() }
+            return
+        }
+        let l = L10n(lang: AppLanguage(rawValue: UserDefaults.standard.string(forKey: "language") ?? "en") ?? .en)
         let alert = NSAlert()
-        alert.messageText = "Требуется разрешение Accessibility"
-        alert.informativeText = "Откройте Системные настройки → Конфиденциальность и безопасность → Универсальный доступ и добавьте это приложение."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Открыть настройки")
-        alert.addButton(withTitle: "Отмена")
+        alert.messageText     = l.accessibilityAlertTitle
+        alert.informativeText = l.accessibilityAlertBody
+        alert.alertStyle      = .warning
+        alert.addButton(withTitle: l.accessibilityAlertOpen)
+        alert.addButton(withTitle: l.accessibilityAlertCancel)
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.open(
                 URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!

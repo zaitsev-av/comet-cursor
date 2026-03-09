@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var renderers: [CometRenderer] = []
     private var settingsWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
     private var toggleMenuItem: NSMenuItem?
     private var settingsMenuItem: NSMenuItem?
     private var quitMenuItem: NSMenuItem?
@@ -37,14 +38,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         NSApp.setActivationPolicy(.accessory)
         setupStatusBar()
-        rebuildRenderers()
-        startZOrderEnforcer()
-        startTracking()
-        subscribeToWorkspaceEvents()
         languageCancellable = settings.$language
             .dropFirst()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateMenuTitles() }
+
+        if AXIsProcessTrusted() {
+            startApp()
+        } else {
+            showOnboarding()
+        }
+    }
+
+    // MARK: - Onboarding
+
+    private func showOnboarding() {
+        let view = OnboardingView(settings: settings) { [weak self] in
+            self?.onboardingWindow?.close()
+            self?.onboardingWindow = nil
+            self?.startApp()
+        }
+        let controller = NSHostingController(rootView: view)
+        let win = NSWindow(contentViewController: controller)
+        win.styleMask = [.titled, .closable, .fullSizeContentView]
+        win.titlebarAppearsTransparent = true
+        win.titleVisibility = .hidden
+        win.isReleasedWhenClosed = false
+        win.center()
+        onboardingWindow = win
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func startApp() {
+        rebuildRenderers()
+        startZOrderEnforcer()
+        startTracking()
+        subscribeToWorkspaceEvents()
     }
 
     // MARK: - Status bar
