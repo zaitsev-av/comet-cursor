@@ -18,7 +18,7 @@ jobs:
 
       - name: Build and package DMG
         working-directory: CometCursorApp
-        run: ./make_dmg.sh ${{ steps.version.outputs.VERSION }}
+        run: .scripts/make_dmg.sh ${{ steps.version.outputs.VERSION }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
