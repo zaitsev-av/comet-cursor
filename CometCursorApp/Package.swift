@@ -10,9 +10,11 @@ let package = Package(
             path: "Sources/CometCursorApp",
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("Carbon"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
                 .linkedFramework("CoreGraphics"),
+                .linkedFramework("ServiceManagement"),
             ]
         )
     ]

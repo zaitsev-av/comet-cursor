@@ -18,6 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appObserverTokens: [NSObjectProtocol] = []
     private var zOrderEnforcerTimer: Timer?
     private var languageCancellable: AnyCancellable?
+    private var exclusionCancellable: AnyCancellable?
+    private var shortcutCancellable: AnyCancellable?
+    private var launchAtLoginCancellable: AnyCancellable?
+    private var hasStartedApp = false
+    private var permissionMonitorTimer: Timer?
 
     // Предотвращаем App Nap - macOS иначе останавливает render loop когда приложение неактивно
     private var renderActivity: NSObjectProtocol?
@@ -25,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     deinit {
         zOrderEnforcerTimer?.invalidate()
         zOrderEnforcerTimer = nil
+        permissionMonitorTimer?.invalidate()
+        permissionMonitorTimer = nil
         removeObservers()
         if let renderActivity {
             ProcessInfo.processInfo.endActivity(renderActivity)
@@ -41,7 +48,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         languageCancellable = settings.$language
             .dropFirst()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.updateMenuTitles() }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.updateMenuTitles()
+                self.settings.updateLaunchAtLoginStatus(
+                    LaunchAtLoginManager.shared.currentStatusMessage(language: self.settings.language)
+                )
+            }
+
+        exclusionCancellable = settings.$excludedApps
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.syncOverlayVisibility() }
+
+        shortcutCancellable = settings.$globalShortcutEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { HotkeyManager.shared.setEnabled($0) }
+
+        launchAtLoginCancellable = settings.$launchAtLogin
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                let status = LaunchAtLoginManager.shared.applyPreference(enabled, language: self.settings.language)
+                self.settings.updateLaunchAtLoginStatus(status)
+            }
+
+        if settings.launchAtLogin {
+            settings.updateLaunchAtLoginStatus(
+                LaunchAtLoginManager.shared.applyPreference(true, language: settings.language)
+            )
+        } else {
+            settings.updateLaunchAtLoginStatus(
+                LaunchAtLoginManager.shared.currentStatusMessage(language: settings.language)
+            )
+        }
 
         if AXIsProcessTrusted() {
             startApp()
@@ -53,6 +93,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Onboarding
 
     private func showOnboarding() {
+        if let onboardingWindow {
+            onboardingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
         let view = OnboardingView(settings: settings) { [weak self] in
             self?.onboardingWindow?.close()
             self?.onboardingWindow = nil
@@ -71,10 +117,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startApp() {
+        guard !hasStartedApp else {
+            refreshActiveApplication()
+            syncOverlayVisibility()
+            return
+        }
+        hasStartedApp = true
         rebuildRenderers()
         startZOrderEnforcer()
-        startTracking()
+        configureTrackingCallbacks()
+        ensureTracking()
+        startPermissionMonitor()
+        startShortcut()
         subscribeToWorkspaceEvents()
+        refreshActiveApplication()
+        syncOverlayVisibility()
     }
 
     // MARK: - Status bar
@@ -110,19 +167,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleEnabled() {
         settings.isEnabled.toggle()
         toggleMenuItem?.state = settings.isEnabled ? .on : .off
-        if !settings.isEnabled { trailManager.clear() }
+        syncOverlayVisibility()
     }
 
     @objc private func openSettings() {
         if settingsWindow == nil {
             let view = SettingsView(settings: settings)
             let controller = NSHostingController(rootView: view)
-            controller.view.frame = CGRect(x: 0, y: 0, width: 400, height: 420)
+            controller.view.frame = CGRect(x: 0, y: 0, width: 460, height: 620)
             let win = NSWindow(contentViewController: controller)
             win.title = settings.l10n.windowTitle
             win.styleMask = [.titled, .closable]
             win.isReleasedWhenClosed = false
-            win.setContentSize(CGSize(width: 400, height: 420))
+            win.setContentSize(CGSize(width: 460, height: 620))
             win.center()
             settingsWindow = win
         }
@@ -166,12 +223,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let nc = NSWorkspace.shared.notificationCenter
         let didActivateToken = nc.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
                                               object: nil, queue: .main) { [weak self] _ in
+            self?.refreshActiveApplication()
             self?.renderers.forEach { $0.orderFront() }
         }
         workspaceObserverTokens.append(didActivateToken)
 
         let activeSpaceToken = nc.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
                                               object: nil, queue: .main) { [weak self] _ in
+            self?.refreshActiveApplication()
             self?.renderers.forEach { $0.orderFront() }
         }
         workspaceObserverTokens.append(activeSpaceToken)
@@ -179,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let anc = NotificationCenter.default
         let didBecomeActiveToken = anc.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                    object: nil, queue: .main) { [weak self] _ in
+            self?.ensureTracking()
             self?.renderers.forEach { $0.orderFront() }
         }
         appObserverTokens.append(didBecomeActiveToken)
@@ -204,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Фолбэк: некоторые окна остаются "visible", но уходят под активное приложение.
         // Периодический orderFrontRegardless стабилизирует overlay при запуске из Finder.
         zOrderEnforcerTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
-            guard let self, self.settings.isEnabled else { return }
+            guard let self, self.canRenderTrail else { return }
             self.renderers.forEach { $0.orderFront() }
         }
     }
@@ -225,15 +285,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Cursor tracking
 
-    private func startTracking() {
+    private func configureTrackingCallbacks() {
         CursorTracker.shared.onMove = { [weak self] x, y in
-            guard let self, self.settings.isEnabled else { return }
+            guard let self, self.canRenderTrail else { return }
             self.trailManager.update(
                 x: Float(x), y: Float(y),
                 maxLength: Int(self.settings.trailLength)
             )
         }
-        CursorTracker.shared.start()
+    }
+
+    private func ensureTracking(showPromptIfDenied: Bool = false) {
+        CursorTracker.shared.start(showPromptIfDenied: showPromptIfDenied)
+    }
+
+    private func startPermissionMonitor() {
+        permissionMonitorTimer?.invalidate()
+        permissionMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.ensureTracking()
+        }
+    }
+
+    private func startShortcut() {
+        HotkeyManager.shared.onToggle = { [weak self] in
+            self?.toggleEnabled()
+        }
+        HotkeyManager.shared.setEnabled(settings.globalShortcutEnabled)
+    }
+
+    private var canRenderTrail: Bool {
+        settings.isEnabled && !settings.isExcluded(bundleID: settings.activeAppBundleID)
+    }
+
+    private func refreshActiveApplication() {
+        ensureTracking()
+        let app = NSWorkspace.shared.frontmostApplication
+        settings.setActiveApplication(
+            name: app?.localizedName ?? "",
+            bundleID: app?.bundleIdentifier ?? ""
+        )
+        syncOverlayVisibility()
+    }
+
+    private func syncOverlayVisibility() {
+        let shouldShowOverlay = canRenderTrail
+        if !shouldShowOverlay {
+            trailManager.clear()
+        }
+        renderers.forEach { $0.setVisible(shouldShowOverlay) }
+        if shouldShowOverlay {
+            renderers.forEach { $0.orderFront() }
+        }
     }
 }
 

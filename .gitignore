@@ -4,9 +4,9 @@
 *.xcuserstate
 xcuserdata/
 
-# Go
-comet-cursor
-.comet-cursor.pid
+# Go prototype
+prototype-go/comet-cursor
+prototype-go/.comet-cursor.pid
 
 # Swift / SPM
 CometCursorApp/.build/
@@ -15,3 +15,5 @@ CometCursorApp/.swiftpm/
 
 # macOS
 .DS_Store
+
+docs

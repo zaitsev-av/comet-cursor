@@ -16,6 +16,7 @@ private struct Uniforms {
     var tailColor: SIMD4<Float>
     var headColor: SIMD4<Float>
     var opacity: Float
+    var style: Int32
 }
 
 // Шейдеры компилируются в рантайме из строки,
@@ -40,6 +41,7 @@ struct Uniforms {
     float4 tailColor;
     float4 headColor;
     float  opacity;
+    int    style;
 };
 
 vertex FragIn vertex_main(
@@ -58,14 +60,23 @@ fragment float4 fragment_main(
     FragIn in [[stage_in]],
     constant Uniforms& u [[buffer(0)]])
 {
-    // Плавный falloff от центра к краю линии
     float edgeFalloff = smoothstep(1.0, 0.0, abs(in.edge));
+    float gradient = smoothstep(0.0, 1.0, in.alpha);
+    float t = pow(gradient, 0.85);
+    float alphaCurve = pow(in.alpha, 1.18);
 
-    // Смещённый градиент: больше яркого цвета у головы
-    float t = pow(smoothstep(0.0, 1.0, in.alpha), 0.15);
+    if (u.style == 1) {
+        edgeFalloff = pow(edgeFalloff, 0.75);
+        t = pow(gradient, 0.55);
+        alphaCurve = min(1.0, pow(in.alpha, 1.02) * 1.03);
+    } else if (u.style == 2) {
+        edgeFalloff = pow(edgeFalloff, 2.2);
+        t = pow(gradient, 1.25);
+        alphaCurve = pow(in.alpha, 1.45);
+    }
+
     float3 color = mix(u.tailColor.rgb, u.headColor.rgb, t);
-
-    float alpha = in.alpha * edgeFalloff * u.opacity;
+    float alpha = alphaCurve * edgeFalloff * u.opacity;
     return float4(color, alpha);
 }
 """#
@@ -83,6 +94,7 @@ final class CometRenderer: NSObject, MTKViewDelegate {
     private let commandQueue: MTLCommandQueue
     private var pipelineState: MTLRenderPipelineState!
     private var keepAliveTimer: Timer?
+    private var isOverlayVisible = true
 
     // Высота основного экрана для конвертации CGEvent Y↓ → AppKit Y↑
     private let primaryHeight: CGFloat
@@ -151,6 +163,7 @@ final class CometRenderer: NSObject, MTKViewDelegate {
         // или window server их прервали. Работает независимо от draw loop.
         keepAliveTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
+            guard self.isOverlayVisible else { return }
             if self.mtkView.isPaused { self.mtkView.isPaused = false }
             // isVisible не означает "поверх всех окон", поэтому фронтим регулярно.
             self.window.orderFrontRegardless()
@@ -158,7 +171,19 @@ final class CometRenderer: NSObject, MTKViewDelegate {
     }
 
     func orderFront() {
+        guard isOverlayVisible else { return }
         window.orderFrontRegardless()
+    }
+
+    func setVisible(_ visible: Bool) {
+        isOverlayVisible = visible
+        mtkView.isPaused = !visible
+
+        if visible {
+            window.orderFrontRegardless()
+        } else {
+            window.orderOut(nil)
+        }
     }
 
     func shutdown() {
@@ -243,7 +268,8 @@ final class CometRenderer: NSObject, MTKViewDelegate {
 
         for i in 0..<ndcPts.count {
             let progress = Float(i) / Float(ndcPts.count - 1)
-            let alpha    = (0.3 + 0.7 * progress) * fadeAlpha
+            let widthScale = max(0.035, pow(progress, 0.9))
+            let alpha = pow(progress, 1.3) * fadeAlpha
             let p        = ndcPts[i]
 
             // Касательная — хорда через соседние точки → гладкий стык без разрыва
@@ -256,8 +282,9 @@ final class CometRenderer: NSObject, MTKViewDelegate {
                 tangentPerp = perp(from: ndcPts[i - 1], to: ndcPts[i + 1])
             }
 
-            verts.append(Vertex(position: p - tangentPerp, alpha: alpha, edge: -1))
-            verts.append(Vertex(position: p + tangentPerp, alpha: alpha, edge: +1))
+            let taperedPerp = tangentPerp * widthScale
+            verts.append(Vertex(position: p - taperedPerp, alpha: alpha, edge: -1))
+            verts.append(Vertex(position: p + taperedPerp, alpha: alpha, edge: +1))
         }
 
         return verts
@@ -296,7 +323,8 @@ final class CometRenderer: NSObject, MTKViewDelegate {
             var uniforms = Uniforms(
                 tailColor: settings.tailColorSIMD,
                 headColor: settings.headColorSIMD,
-                opacity: Float(settings.opacity)
+                opacity: Float(settings.opacity),
+                style: settings.renderStyle.shaderValue
             )
 
             encoder.setRenderPipelineState(pipelineState)

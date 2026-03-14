@@ -23,12 +23,16 @@ struct L10n {
     var windowTitle: String     { s("Comet Cursor — Settings", "Comet Cursor — Настройки") }
 
     // MARK: - Settings sections
+    var sectionPresets: String  { s("Quick Start",    "Быстрый старт") }
     var sectionTrail: String    { s("Trail",         "Хвост") }
     var sectionFade: String     { s("Fade",          "Затухание") }
     var sectionColors: String   { s("Colors",        "Цвета") }
+    var sectionControl: String  { s("Control",       "Управление") }
     var sectionApp: String      { s("Application",   "Приложение") }
 
     // MARK: - Settings labels
+    var labelPreset: String     { s("Preset",        "Пресет") }
+    var labelStyle: String      { s("Style",         "Стиль") }
     var labelLength: String     { s("Length",        "Длина") }
     var labelWidth: String      { s("Width",         "Толщина") }
     var labelOpacity: String    { s("Opacity",       "Прозрачность") }
@@ -37,6 +41,18 @@ struct L10n {
     var labelTailColor: String  { s("Trail color",   "Цвет хвоста") }
     var labelHeadColor: String  { s("Head color",    "Цвет головы") }
     var labelLanguage: String   { s("Language",      "Язык") }
+    var labelShortcut: String   { s("Global shortcut", "Глобальная клавиша") }
+    var labelLoginItem: String  { s("Launch at login", "Запуск при входе") }
+    var labelExcludedApps: String { s("Hidden in apps", "Скрывать в приложениях") }
+    var labelCurrentApp: String { s("Current app", "Текущее приложение") }
+    var labelPresetHint: String { s("Pick a ready-made look for demos, recordings, and calls.", "Выберите готовый стиль для демо, записей и созвонов.") }
+    var labelShortcutHint: String { s("Use a system-wide shortcut to pause or resume the cursor effect instantly.", "Используйте системное сочетание, чтобы мгновенно включать или ставить эффект на паузу.") }
+    var labelNoExcludedApps: String { s("No exclusions yet.", "Список исключений пока пуст.") }
+    var labelCustomPreset: String { s("Custom", "Свои настройки") }
+    var labelAddCurrentApp: String { s("Hide in current app", "Скрывать в текущем приложении") }
+    var labelCurrentAppUnavailable: String { s("Open another app to add it here.", "Откройте другое приложение, чтобы добавить его сюда.") }
+    var labelLaunchAtLoginHint: String { s("Best for menu bar workflows after you sign the app bundle.", "Лучше всего работает после подписи app bundle.") }
+    var labelPresenterPositioning: String { s("Built for screen sharing, demos, and recordings.", "Сделано для демонстраций экрана, демо и записей.") }
 
     // MARK: - Dynamic labels
     func fadeSpeedLabel(_ speed: Double) -> String {
@@ -54,23 +70,23 @@ struct L10n {
     }
 
     // MARK: - Onboarding
-    var onboardingTitle: String       { s("Welcome to Comet Cursor",      "Добро пожаловать") }
-    var onboardingSubtitle: String    { s("Beautiful cursor trails for your Mac.", "Красивые следы курсора для вашего Mac.") }
-    var onboardingPermTitle: String   { s("Accessibility Access Required", "Необходим доступ Accessibility") }
+    var onboardingTitle: String       { s("Make your cursor easy to follow",      "Сделайте курсор заметным") }
+    var onboardingSubtitle: String    { s("Comet Cursor keeps attention on your pointer during demos, calls, and screen recordings.", "Comet Cursor помогает следить за курсором во время демо, созвонов и записи экрана.") }
+    var onboardingPermTitle: String   { s("Accessibility improves tracking", "Accessibility улучшает отслеживание") }
     var onboardingPermBody: String    { s(
-        "Comet Cursor uses the Accessibility API to track cursor position across all apps. The data never leaves your device.",
-        "Comet Cursor использует Accessibility API для отслеживания положения курсора. Данные не покидают ваше устройство."
+        "Accessibility gives Comet Cursor the smoothest cross-app tracking. You can continue without it and upgrade later in System Settings. Your data never leaves your Mac.",
+        "Accessibility даёт Comet Cursor самое плавное отслеживание во всех приложениях. Можно продолжить и без него, а затем включить доступ позже в системных настройках. Данные не покидают ваш Mac."
     ) }
     var onboardingOpenSettings: String { s("Open System Settings", "Открыть системные настройки") }
     var onboardingWaiting: String     { s("Waiting for permission\u{2026}", "Ожидание разрешения\u{2026}") }
-    var onboardingGranted: String     { s("Access granted — let's go!", "Доступ получен — поехали!") }
-    var onboardingSkip: String        { s("Skip", "Пропустить") }
+    var onboardingGranted: String     { s("Access granted — you're ready to present.", "Доступ получен — можно показывать экран.") }
+    var onboardingSkip: String        { s("Continue without access", "Продолжить без доступа") }
 
     // MARK: - Accessibility error (fallback alert)
     var accessibilityAlertTitle: String { s("Accessibility Permission Required", "Необходимо разрешение Accessibility") }
     var accessibilityAlertBody: String  { s(
-        "Open System Settings → Privacy & Security → Accessibility and add Comet Cursor.",
-        "Откройте Системные настройки → Конфиденциальность и безопасность → Универсальный доступ и добавьте это приложение."
+        "Open System Settings → Privacy & Security → Accessibility and add Comet Cursor for smoother cross-app tracking.",
+        "Откройте Системные настройки → Конфиденциальность и безопасность → Универсальный доступ и добавьте это приложение для более плавного отслеживания."
     ) }
     var accessibilityAlertOpen: String  { s("Open Settings", "Открыть настройки") }
     var accessibilityAlertCancel: String { s("Cancel", "Отмена") }

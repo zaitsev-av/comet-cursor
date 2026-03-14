@@ -41,18 +41,45 @@ final class CursorTracker {
     private var pollTimer: Timer?
     private var lastDeliveredLocation: CGPoint?
     private var lastEventTapMoveTime: TimeInterval = 0
+    private lazy var selfPtr: UnsafeMutableRawPointer = Unmanaged.passUnretained(self).toOpaque()
 
-    func start() {
+    var isTrusted: Bool { AXIsProcessTrusted() }
+    var isUsingEventTap: Bool { eventTap != nil }
+
+    func start(showPromptIfDenied: Bool = false) {
         startPollingCursor()
+        ensureEventTap(showPromptIfDenied: showPromptIfDenied)
+    }
 
+    func ensureEventTap(showPromptIfDenied: Bool = false) {
+        guard isTrusted else {
+            tearDownEventTap()
+            if showPromptIfDenied { showAccessibilityError() }
+            return
+        }
+
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: true)
+            return
+        }
+
+        createEventTap()
+    }
+
+    func stop() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+        tearDownEventTap()
+        lastDeliveredLocation = nil
+        lastEventTapMoveTime = 0
+    }
+
+    private func createEventTap() {
         let mask = CGEventMask(
             (1 << CGEventType.mouseMoved.rawValue) |
             (1 << CGEventType.leftMouseDragged.rawValue) |
             (1 << CGEventType.rightMouseDragged.rawValue)
         )
-
-        // selfPtr живёт на протяжении всего срока жизни синглтона — утечка допустима.
-        let selfPtr = Unmanaged.passRetained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
             tap: .cghidEventTap,
@@ -62,7 +89,9 @@ final class CursorTracker {
             callback: eventTapCallback,
             userInfo: selfPtr
         ) else {
-            showAccessibilityError()
+            if !isTrusted {
+                showAccessibilityError()
+            }
             // Не прекращаем трекинг: polling курсора продолжит работу даже без tap.
             return
         }
@@ -82,7 +111,7 @@ final class CursorTracker {
     }
 
     private func startPollingCursor() {
-        pollTimer?.invalidate()
+        guard pollTimer == nil else { return }
         // Поллинг делает трекинг независимым от фокуса приложения и состояний event tap.
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -106,15 +135,19 @@ final class CursorTracker {
         onMove?(loc.x, loc.y)
     }
 
-    var onAccessibilityDenied: (() -> Void)?
+    private func tearDownEventTap() {
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+            self.runLoopSource = nil
+        }
+
+        if let eventTap {
+            CFMachPortInvalidate(eventTap)
+            self.eventTap = nil
+        }
+    }
 
     private func showAccessibilityError() {
-        // Primary flow: onboarding intercepts this before app starts.
-        // This fallback fires only if permission is revoked while the app is running.
-        if let handler = onAccessibilityDenied {
-            DispatchQueue.main.async { handler() }
-            return
-        }
         let l = L10n(lang: AppLanguage(rawValue: UserDefaults.standard.string(forKey: "language") ?? "en") ?? .en)
         let alert = NSAlert()
         alert.messageText     = l.accessibilityAlertTitle
