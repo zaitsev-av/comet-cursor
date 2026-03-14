@@ -174,6 +174,12 @@ The original Go + CGo + OpenGL proof of concept lives in [`prototype-go/`](./pro
 
 ---
 
+## Support
+
+If the app is useful to you, you can support development:
+
+- [Boosty](https://boosty.to/zaitsev_av)
+
 ## License
 
 MIT
