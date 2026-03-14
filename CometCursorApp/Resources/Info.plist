@@ -6,6 +6,8 @@
     <string>CometCursor</string>
     <key>CFBundleIdentifier</key>
     <string>com.cometcursor.app</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleName</key>
     <string>Comet Cursor</string>
     <key>CFBundleVersion</key>

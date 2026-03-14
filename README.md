@@ -1,127 +1,179 @@
 # Comet Cursor
 
-Приложение для macOS, которое создает красивый хвост кометы за курсором мыши. Идеально подходит для презентаций и демонстрации экрана.
+A menu bar app for macOS that adds a glowing comet trail to your cursor. Handy for demos, presentations, screen recordings, and live coding.
 
-## Возможности
+<p align="center">
+  <img src="assets/demo.gif" width="700" alt="Comet Cursor in action">
+</p>
 
-- ✨ Красивый градиентный хвост за курсором
-- 🎨 Оранжево-желтый цвет с плавным переходом прозрачности
-- 🚀 Плавная анимация с 60 FPS
-- 🖱️ Отслеживание движений мыши в реальном времени
-- 💻 Прозрачное окно поверх всех приложений
+---
 
-## Требования
+## Download
 
-- macOS (протестировано на современных версиях)
-- Go 1.24.6 или новее
-- OpenGL 3.3
-- Разрешения Accessibility для отслеживания курсора
+**[Download latest release](../../releases/latest)** - grab the `.dmg`, open it, drag to Applications.
 
-## Установка и запуск
+> First launch: macOS will warn that the app is from an unidentified developer (it's not signed with a $99/yr Apple certificate). Right-click the app -> **Open** -> **Open** to allow it once. After that it launches normally.
 
-### Быстрый запуск
+---
 
-```bash
-# Запустить приложение
-./run.sh start
+## English
 
-# Остановить приложение  
-./run.sh stop
+### What it does
 
-# Перезапустить приложение
-./run.sh restart
+- Animated comet trail that follows your cursor in real time
+- Three built-in presets: `Presenter Glow`, `Neon Focus`, `Minimal Trace`
+- Adjust trail length, thickness, opacity, and fade speed on the fly - no restart needed
+- Separate color pickers for the trail body and the head
+- Global toggle and pause via `⌥⌘C`
+- Per-app exclusion list so the effect doesn't get in the way in specific apps
+- Launch at Login support
+- Works across multiple monitors - one overlay per screen, always on top
+- UI localized in English and Russian
 
-# Проверить статус
-./run.sh status
-```
+### Who it's for
 
-## Управление
+If you regularly share your screen, this is probably for you:
 
-- **ESC** - выход из приложения
-- **Клики мыши** - проходят сквозь окно приложения, не мешая работе с другими программами
-- **Cmd+Tab** - переключение между приложениями работает как обычно
+- Developers doing live demos or pair programming sessions
+- Designers and PMs walking through Figma or slides
+- Teachers and mentors pointing things out on screen
+- Streamers and video creators recording screencasts
 
-### Ручная сборка и запуск
+### Quick start
 
 ```bash
-# Собрать приложение
-go build -o comet-cursor main.go
-
-# Запустить
-./comet-cursor
+cd CometCursorApp
+./build.sh
+open "Comet Cursor.app"
 ```
 
-## Настройка разрешений
+### Permissions
 
-При первом запуске macOS может запросить разрешения:
+The app tracks the cursor via `CGEventTap`, which requires **Accessibility** access. Without it, macOS won't let the event tap run.
 
-1. **Accessibility permissions**: Необходимо для отслеживания движений курсора
-   - Перейдите в System Preferences → Security & Privacy → Privacy → Accessibility
-   - Добавьте ваш терминал (Terminal.app или другой) в список разрешенных приложений
+To enable:
 
-2. **Screen recording permissions**: Может потребоваться для отображения поверх других окон
+1. Open `System Settings -> Privacy & Security -> Accessibility`
+2. Add `Comet Cursor` to the list
 
-## Особенности реализации
+If you skip this, the app falls back to a polling-based tracker - it works, but cursor position updates are slightly less precise.
 
-### Графика
-- Использует OpenGL 3.3 Core Profile для кроссплатформенности
-- Вершинные и фрагментные шейдеры для градиентных эффектов
-- Буферизация вершин для плавной анимации
+### Architecture
 
-### Отслеживание курсора
-- Использует Core Graphics Event Tap для низкоуровневого отслеживания
-- Работает независимо от фокуса приложения
-- Оптимизирован для минимальной задержки
+<p align="center">
+  <img src="assets/settings.png" width="380" alt="Comet Cursor settings panel">
+</p>
 
-### Производительность
-- Обновление каждые 8ms (125 FPS для отслеживания)
-- Рендеринг со скоростью 60 FPS
-- Буферизация до 60 точек в хвосте
-- Автоматическая очистка старых точек
+Built with **SwiftUI + Metal + AppKit**, targeting macOS 13+.
 
-## Возможные проблемы
+| File | What it does |
+|---|---|
+| `AppDelegate.swift` | Menu bar item, settings window, overlay window lifecycle |
+| `CursorTracker.swift` | CGEventTap with polling fallback |
+| `TrailManager.swift` | Trail point history, timestamp-based fade logic |
+| `CometRenderer.swift` | Metal rendering, ribbon geometry, presets |
+| `SettingsModel.swift` | ObservableObject wrapping UserDefaults |
+| `SettingsView.swift` | SwiftUI settings panel, sliders, color pickers |
 
-### Приложение не запускается
-- Убедитесь, что у терминала есть Accessibility permissions
-- Проверьте версию Go: `go version`
-- Попробуйте пересобрать: `go mod tidy && go build`
-
-### Хвост не отображается
-- Убедитесь, что окно приложения не заблокировано другими окнами
-- Проверьте поддержку OpenGL: должна быть версия 3.3+
-
-### Высокое использование CPU
-- Это нормально для графических приложений реального времени
-- Можно увеличить интервал обновления в коде (измените `8*time.Millisecond`)
-
-## Кастомизация
-
-Вы можете изменить различные параметры в `main.go`:
-
-```go
-// Цвета хвоста (в фрагментном шейдере)
-vec3 color = mix(vec3(1.0, 0.4, 0.0), vec3(1.0, 1.0, 0.2), vAlpha);
-
-// Длина хвоста
-if len(trail) > 60 {  // Измените 60 на желаемое количество точек
-
-// Толщина линии
-gl.LineWidth(3.0)     // Измените 3.0 на желаемую толщину
-
-// Частота обновления
-if time.Since(lastUpdate) > 8*time.Millisecond {  // Измените интервал
+**Data flow:**
+```
+CGEventTap -> DispatchQueue.main -> TrailManager.update()
+                                          |
+MTKView render thread -> TrailManager.tick() + snapshot() -> CometRenderer.draw()
 ```
 
-## Архитектура
+**Rendering:** The trail is a Metal triangle strip ribbon. Each trail point generates a left/right vertex pair; adjacent segments share vertices so there are no gaps at joints. Soft-edge falloff is done in the fragment shader rather than relying on `glLineWidth`. Shaders are compiled at runtime from a source string via `device.makeLibrary(source:)` - no `xcrun metal` needed at build time.
 
+**Multi-monitor:** `NSScreen.screens` gives us the list of active displays. We create one `NSWindow + MTKView` per screen and position each with `setFrame(screen.frame)`.
+
+**Coordinate conversion:** CGEvent uses a top-left origin (Y increases downward), AppKit uses bottom-left (Y increases upward). The conversion happens before passing points to the renderer.
+
+---
+
+## Скачать
+
+**[Скачать последний релиз](../../releases/latest)** - скачай `.dmg`, открой, перетащи в Applications.
+
+> При первом запуске macOS покажет предупреждение о неизвестном разработчике (приложение не подписано платным сертификатом Apple). Нажми правой кнопкой на приложение -> **Открыть** -> **Открыть** - и больше это предупреждение не появится.
+
+---
+
+## Русский
+
+### Что умеет
+
+- Анимированный хвост кометы в реальном времени
+- Три пресета: `Presenter Glow`, `Neon Focus`, `Minimal Trace`
+- Настройка длины, толщины, прозрачности и скорости затухания на лету - без перезапуска
+- Отдельные цветопикеры для тела хвоста и его головы
+- Глобальное включение/пауза через `⌥⌘C`
+- Список исключений - можно отключить эффект в конкретных приложениях
+- Запуск при входе в систему
+- Работает на нескольких мониторах - отдельный overlay на каждый экран, всегда поверх окон
+- Интерфейс на английском и русском
+
+### Для кого
+
+Если вы регулярно показываете экран, это приложение для вас:
+
+- Разработчики на демо и парном программировании
+- Дизайнеры и PM на презентациях в Figma или слайдах
+- Преподаватели и менторы, объясняющие что-то на экране
+- Стримеры и авторы скринкастов
+
+### Быстрый старт
+
+```bash
+cd CometCursorApp
+./build.sh
+open "Comet Cursor.app"
 ```
-main.go
-├── C код для отслеживания курсора (Core Graphics)
-├── GLFW для создания окна
-├── OpenGL для рендеринга
-└── Go для логики приложения
+
+### Разрешения
+
+Приложение отслеживает курсор через `CGEventTap`, для которого нужен доступ к **Accessibility**. Без него macOS просто не даст создать event tap.
+
+Как включить:
+
+1. `System Settings -> Privacy & Security -> Accessibility`
+2. Добавьте `Comet Cursor` в список разрешённых приложений
+
+Если пропустить этот шаг, приложение переключится на polling-режим - работает, но с чуть меньшей точностью позиции курсора.
+
+### Архитектура
+
+Написано на **SwiftUI + Metal + AppKit**, минимальная версия macOS 13.
+
+| Файл | За что отвечает |
+|---|---|
+| `AppDelegate.swift` | Иконка в меню-баре, окно настроек, lifecycle overlay-окон |
+| `CursorTracker.swift` | CGEventTap и fallback через polling |
+| `TrailManager.swift` | История точек хвоста, fade по timestamp |
+| `CometRenderer.swift` | Metal-рендеринг, геометрия ленты, пресеты |
+| `SettingsModel.swift` | ObservableObject поверх UserDefaults |
+| `SettingsView.swift` | SwiftUI-панель настроек, слайдеры, цветопикеры |
+
+**Поток данных:**
+```
+CGEventTap -> DispatchQueue.main -> TrailManager.update()
+                                          |
+MTKView render thread -> TrailManager.tick() + snapshot() -> CometRenderer.draw()
 ```
 
-## Лицензия
+**Рендеринг:** Хвост - это Metal triangle strip (лента). Каждая точка хвоста генерирует пару вершин (левая/правая), соседние сегменты разделяют вершины - никаких разрывов на стыках. Размытие края реализовано в фрагментном шейдере, без `glLineWidth`. Шейдеры компилируются прямо в рантайме из строки через `device.makeLibrary(source:)` - `xcrun metal` при сборке не нужен.
 
-MIT License - свободно используйте, модифицируйте и распространяйте.
+**Мультимонитор:** Берём список экранов из `NSScreen.screens`, создаём по одному `NSWindow + MTKView` на каждый и позиционируем через `setFrame(screen.frame)`.
+
+**Конвертация координат:** CGEvent считает Y сверху вниз, AppKit - снизу вверх. Конвертация происходит до передачи точек в рендерер.
+
+---
+
+## Go Prototype
+
+The original Go + CGo + OpenGL proof of concept lives in [`prototype-go/`](./prototype-go/). It's archived and not maintained - kept around as a reference for the early approach.
+
+---
+
+## License
+
+MIT

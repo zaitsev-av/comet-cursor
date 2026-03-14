@@ -8,6 +8,11 @@ xcuserdata/
 prototype-go/comet-cursor
 prototype-go/.comet-cursor.pid
 
+# Build artifacts
+CometCursorApp/*.dmg
+CometCursorApp/icon_source.png
+CometCursorApp/make_icon.swift
+
 # Swift / SPM
 CometCursorApp/.build/
 CometCursorApp/*.app/

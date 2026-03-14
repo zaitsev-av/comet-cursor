@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build and package DMG
+        working-directory: CometCursorApp
+        run: ./make_dmg.sh ${{ steps.version.outputs.VERSION }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Comet Cursor ${{ github.ref_name }}"
+          body: |
+            ## Install
+
+            1. Download `CometCursor-${{ steps.version.outputs.VERSION }}.dmg`
+            2. Open it and drag **Comet Cursor** to Applications
+            3. Launch from Applications or Spotlight
+
+            > **First launch:** macOS may block the app since it's not from the App Store.
+            > Right-click the app -> **Open** -> **Open** to allow it once.
+
+            ## What's new
+
+            See [CHANGELOG](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
+          files: CometCursorApp/CometCursor-${{ steps.version.outputs.VERSION }}.dmg
+          draft: false
+          prerelease: false
