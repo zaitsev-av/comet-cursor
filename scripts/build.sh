@@ -15,5 +15,7 @@ cp "$BINARY"                    "$APP/Contents/MacOS/CometCursor"
 cp "Resources/Info.plist"       "$APP/Contents/Info.plist"
 cp "Resources/AppIcon.icns"     "$APP/Contents/Resources/AppIcon.icns"
 
+codesign --deep --force --sign - "$APP"
+
 echo "✓ Собрано: $APP"
 echo "  Запуск:  open \"$APP\""

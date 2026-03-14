@@ -12,7 +12,12 @@ A menu bar app for macOS that adds a glowing comet trail to your cursor. Handy f
 
 **[Download latest release](../../releases/latest)** - grab the `.dmg`, open it, drag to Applications.
 
-> First launch: macOS will warn that the app is from an unidentified developer (it's not signed with a $99/yr Apple certificate). Right-click the app -> **Open** -> **Open** to allow it once. After that it launches normally.
+> **First launch:** macOS may block the app since it's not signed with an Apple certificate. Right-click the app -> **Open** -> **Open** to allow it once.
+>
+> If you see "app is damaged and can't be opened" - run this in Terminal, then launch again:
+> ```
+> xattr -cr "/Applications/Comet Cursor.app"
+> ```
 
 ---
 
@@ -94,7 +99,12 @@ MTKView render thread -> TrailManager.tick() + snapshot() -> CometRenderer.draw(
 
 **[Скачать последний релиз](../../releases/latest)** - скачай `.dmg`, открой, перетащи в Applications.
 
-> При первом запуске macOS покажет предупреждение о неизвестном разработчике (приложение не подписано платным сертификатом Apple). Нажми правой кнопкой на приложение -> **Открыть** -> **Открыть** - и больше это предупреждение не появится.
+> **При первом запуске** macOS может заблокировать приложение, так как оно не подписано сертификатом Apple. Нажми правой кнопкой -> **Открыть** -> **Открыть**.
+>
+> Если видишь "приложение повреждено и не может быть открыто" - выполни в Терминале и запусти снова:
+> ```
+> xattr -cr "/Applications/Comet Cursor.app"
+> ```
 
 ---
 
