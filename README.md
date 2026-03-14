@@ -1,23 +1,89 @@
-# Comet Cursor
+<p align="center">
+  <img src="assets/demo.gif" width="680" alt="Comet Cursor in action">
+</p>
 
-A menu bar app for macOS that adds a glowing comet trail to your cursor. Handy for demos, presentations, screen recordings, and live coding.
+<h1 align="center">Comet Cursor</h1>
 
 <p align="center">
-  <img src="assets/demo.gif" width="700" alt="Comet Cursor in action">
+  A menu bar app for macOS that adds a glowing comet trail to your cursor.<br>
+  Приложение для macOS, которое добавляет светящийся хвост кометы к курсору.
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/zaitsev-av/comet-cursor?label=Download&color=orange" alt="Download"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-blue" alt="macOS 13+">
+  <img src="https://img.shields.io/badge/Swift-5.9-orange" alt="Swift">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
+  <a href="https://boosty.to/zaitsev_av"><img src="https://img.shields.io/badge/Support-Boosty-f15f2c" alt="Support on Boosty"></a>
+</p>
+
+---
+
+<p align="center">
+  <a href="#english">English</a> &nbsp;|&nbsp; <a href="#русский">Русский</a>
 </p>
 
 ---
 
 ## Download
 
-**[Download latest release](../../releases/latest)** - grab the `.dmg`, open it, drag to Applications.
+<table>
+<tr>
+<td>
 
-> **First launch:** macOS may block the app since it's not signed with an Apple certificate. Right-click the app -> **Open** -> **Open** to allow it once.
+**English:** Download the `.dmg`, open it, drag **Comet Cursor** to Applications.
+
+> **First launch:** macOS may block the app since it's not signed with an Apple certificate.
+> Right-click the app -> **Open** -> **Open** to allow it once.
 >
-> If you see "app is damaged and can't be opened" - run this in Terminal, then launch again:
+> If you see "app is damaged" - run in Terminal:
 > ```
 > xattr -cr "/Applications/Comet Cursor.app"
 > ```
+
+</td>
+<td>
+
+**Русский:** Скачай `.dmg`, открой, перетащи **Comet Cursor** в Applications.
+
+> **При первом запуске** macOS может заблокировать приложение.
+> Нажми правой кнопкой -> **Открыть** -> **Открыть**.
+>
+> Если видишь "приложение повреждено" - выполни в Терминале:
+> ```
+> xattr -cr "/Applications/Comet Cursor.app"
+> ```
+
+</td>
+</tr>
+</table>
+
+<p align="center">
+  <a href="../../releases/latest"><strong>Download latest release →</strong></a>
+</p>
+
+---
+
+## Support / Поддержать
+
+<table>
+<tr>
+<td>
+
+If Comet Cursor is useful to you, you can support its development. It helps keep the project alive and motivates new features.
+
+**[Support on Boosty →](https://boosty.to/zaitsev_av)**
+
+</td>
+<td>
+
+Если приложение полезно, поддержи разработку. Это помогает проекту жить и мотивирует делать новые фичи.
+
+**[Поддержать на Boosty →](https://boosty.to/zaitsev_av)**
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -44,41 +110,44 @@ If you regularly share your screen, this is probably for you:
 - Teachers and mentors pointing things out on screen
 - Streamers and video creators recording screencasts
 
-### Quick start
+### Build from source
 
 ```bash
 cd CometCursorApp
-./build.sh
+./scripts/build.sh
 open "Comet Cursor.app"
 ```
 
+Requires Xcode Command Line Tools: `xcode-select --install`
+
 ### Permissions
 
-The app tracks the cursor via `CGEventTap`, which requires **Accessibility** access. Without it, macOS won't let the event tap run.
-
-To enable:
+The app tracks the cursor via `CGEventTap`, which requires **Accessibility** access.
 
 1. Open `System Settings -> Privacy & Security -> Accessibility`
 2. Add `Comet Cursor` to the list
 
-If you skip this, the app falls back to a polling-based tracker - it works, but cursor position updates are slightly less precise.
+Without it, the app falls back to polling - works, but slightly less precise.
 
 ### Architecture
 
 <p align="center">
-  <img src="assets/settings.png" width="380" alt="Comet Cursor settings panel">
+  <img src="assets/settings.png" width="360" alt="Comet Cursor settings panel">
 </p>
 
 Built with **SwiftUI + Metal + AppKit**, targeting macOS 13+.
 
 | File | What it does |
 |---|---|
-| `AppDelegate.swift` | Menu bar item, settings window, overlay window lifecycle |
+| `AppDelegate.swift` | Menu bar item, settings window, overlay lifecycle |
 | `CursorTracker.swift` | CGEventTap with polling fallback |
-| `TrailManager.swift` | Trail point history, timestamp-based fade logic |
+| `TrailManager.swift` | Trail point history, timestamp-based fade |
 | `CometRenderer.swift` | Metal rendering, ribbon geometry, presets |
 | `SettingsModel.swift` | ObservableObject wrapping UserDefaults |
 | `SettingsView.swift` | SwiftUI settings panel, sliders, color pickers |
+
+<details>
+<summary>Data flow & rendering details</summary>
 
 **Data flow:**
 ```
@@ -87,24 +156,13 @@ CGEventTap -> DispatchQueue.main -> TrailManager.update()
 MTKView render thread -> TrailManager.tick() + snapshot() -> CometRenderer.draw()
 ```
 
-**Rendering:** The trail is a Metal triangle strip ribbon. Each trail point generates a left/right vertex pair; adjacent segments share vertices so there are no gaps at joints. Soft-edge falloff is done in the fragment shader rather than relying on `glLineWidth`. Shaders are compiled at runtime from a source string via `device.makeLibrary(source:)` - no `xcrun metal` needed at build time.
+**Rendering:** The trail is a Metal triangle strip ribbon. Each trail point generates a left/right vertex pair; adjacent segments share vertices so there are no gaps at joints. Soft-edge falloff is done in the fragment shader. Shaders compile at runtime via `device.makeLibrary(source:)` - no `xcrun metal` needed at build time.
 
-**Multi-monitor:** `NSScreen.screens` gives us the list of active displays. We create one `NSWindow + MTKView` per screen and position each with `setFrame(screen.frame)`.
+**Multi-monitor:** One `NSWindow + MTKView` per `NSScreen`, positioned via `setFrame(screen.frame)`.
 
-**Coordinate conversion:** CGEvent uses a top-left origin (Y increases downward), AppKit uses bottom-left (Y increases upward). The conversion happens before passing points to the renderer.
+**Coordinate conversion:** CGEvent uses top-left origin (Y down), AppKit uses bottom-left (Y up). Conversion happens before passing points to the renderer.
 
----
-
-## Скачать
-
-**[Скачать последний релиз](../../releases/latest)** - скачай `.dmg`, открой, перетащи в Applications.
-
-> **При первом запуске** macOS может заблокировать приложение, так как оно не подписано сертификатом Apple. Нажми правой кнопкой -> **Открыть** -> **Открыть**.
->
-> Если видишь "приложение повреждено и не может быть открыто" - выполни в Терминале и запусти снова:
-> ```
-> xattr -cr "/Applications/Comet Cursor.app"
-> ```
+</details>
 
 ---
 
@@ -131,24 +189,24 @@ MTKView render thread -> TrailManager.tick() + snapshot() -> CometRenderer.draw(
 - Преподаватели и менторы, объясняющие что-то на экране
 - Стримеры и авторы скринкастов
 
-### Быстрый старт
+### Сборка из исходников
 
 ```bash
 cd CometCursorApp
-./build.sh
+./scripts/build.sh
 open "Comet Cursor.app"
 ```
 
+Требуется Xcode Command Line Tools: `xcode-select --install`
+
 ### Разрешения
 
-Приложение отслеживает курсор через `CGEventTap`, для которого нужен доступ к **Accessibility**. Без него macOS просто не даст создать event tap.
-
-Как включить:
+Приложение отслеживает курсор через `CGEventTap`, для которого нужен доступ к **Accessibility**.
 
 1. `System Settings -> Privacy & Security -> Accessibility`
 2. Добавьте `Comet Cursor` в список разрешённых приложений
 
-Если пропустить этот шаг, приложение переключится на polling-режим - работает, но с чуть меньшей точностью позиции курсора.
+Без него приложение переключится на polling - работает, но с чуть меньшей точностью.
 
 ### Архитектура
 
@@ -163,6 +221,9 @@ open "Comet Cursor.app"
 | `SettingsModel.swift` | ObservableObject поверх UserDefaults |
 | `SettingsView.swift` | SwiftUI-панель настроек, слайдеры, цветопикеры |
 
+<details>
+<summary>Поток данных и детали рендеринга</summary>
+
 **Поток данных:**
 ```
 CGEventTap -> DispatchQueue.main -> TrailManager.update()
@@ -170,25 +231,21 @@ CGEventTap -> DispatchQueue.main -> TrailManager.update()
 MTKView render thread -> TrailManager.tick() + snapshot() -> CometRenderer.draw()
 ```
 
-**Рендеринг:** Хвост - это Metal triangle strip (лента). Каждая точка хвоста генерирует пару вершин (левая/правая), соседние сегменты разделяют вершины - никаких разрывов на стыках. Размытие края реализовано в фрагментном шейдере, без `glLineWidth`. Шейдеры компилируются прямо в рантайме из строки через `device.makeLibrary(source:)` - `xcrun metal` при сборке не нужен.
+**Рендеринг:** Хвост - это Metal triangle strip (лента). Каждая точка хвоста генерирует пару вершин (левая/правая), соседние сегменты разделяют вершины - никаких разрывов. Размытие края в фрагментном шейдере. Шейдеры компилируются в рантайме через `device.makeLibrary(source:)`.
 
-**Мультимонитор:** Берём список экранов из `NSScreen.screens`, создаём по одному `NSWindow + MTKView` на каждый и позиционируем через `setFrame(screen.frame)`.
+**Мультимонитор:** По одному `NSWindow + MTKView` на каждый `NSScreen`, позиционирование через `setFrame(screen.frame)`.
 
-**Конвертация координат:** CGEvent считает Y сверху вниз, AppKit - снизу вверх. Конвертация происходит до передачи точек в рендерер.
+**Конвертация координат:** CGEvent - Y сверху вниз, AppKit - Y снизу вверх. Конвертация до передачи точек в рендерер.
+
+</details>
 
 ---
 
 ## Go Prototype
 
-The original Go + CGo + OpenGL proof of concept lives in [`prototype-go/`](./prototype-go/). It's archived and not maintained - kept around as a reference for the early approach.
+The original Go + CGo + OpenGL proof of concept lives in [`prototype-go/`](./prototype-go/). Archived, not maintained.
 
 ---
-
-## Support
-
-If the app is useful to you, you can support development:
-
-- [Boosty](https://boosty.to/zaitsev_av)
 
 ## License
 
