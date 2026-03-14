@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Always run from CometCursorApp/ regardless of where the script is called from
+cd "$(dirname "$0")/../CometCursorApp"
+
 VERSION="${1:-1.0.0}"
 APP="Comet Cursor.app"
 DMG_NAME="CometCursor-${VERSION}.dmg"
