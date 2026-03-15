@@ -10,9 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/zaitsev-av/comet-cursor?label=Download&color=orange" alt="Download"></a>
+  <a href="https://github.com/zaitsev-av/comet-cursor/releases/latest"><img src="https://img.shields.io/github/v/release/zaitsev-av/comet-cursor?label=Download&color=orange" alt="Download"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-blue" alt="macOS 13+">
-  <img src="https://img.shields.io/badge/Swift-5.9-orange" alt="Swift">
+  <img src="https://img.shields.io/badge/Swift-5.9-orange" alt="Swift 5.9">
+  <img src="https://img.shields.io/badge/Metal-rendering-black" alt="Metal rendering">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
   <a href="https://boosty.to/zaitsev_av"><img src="https://img.shields.io/badge/Support-Boosty-f15f2c" alt="Support on Boosty"></a>
 </p>
