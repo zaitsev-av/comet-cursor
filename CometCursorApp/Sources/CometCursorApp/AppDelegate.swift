@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindow: NSWindow?
     private var toggleMenuItem: NSMenuItem?
     private var settingsMenuItem: NSMenuItem?
+    private var supportMenuItem: NSMenuItem?
     private var quitMenuItem: NSMenuItem?
     private var workspaceObserverTokens: [NSObjectProtocol] = []
     private var appObserverTokens: [NSObjectProtocol] = []
@@ -157,6 +158,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(settingsItem)
         settingsMenuItem = settingsItem
         menu.addItem(.separator())
+        let supportItem = NSMenuItem(title: l.menuSupport, action: #selector(openBoosty), keyEquivalent: "")
+        menu.addItem(supportItem)
+        supportMenuItem = supportItem
+        menu.addItem(.separator())
         let quitItem = NSMenuItem(title: l.menuQuit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
         quitMenuItem = quitItem
@@ -168,6 +173,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.isEnabled.toggle()
         toggleMenuItem?.state = settings.isEnabled ? .on : .off
         syncOverlayVisibility()
+    }
+
+    @objc private func openBoosty() {
+        NSWorkspace.shared.open(URL(string: "https://boosty.to/zaitsev_av")!)
     }
 
     @objc private func openSettings() {
@@ -191,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let l = settings.l10n
         toggleMenuItem?.title   = l.menuEnabled
         settingsMenuItem?.title = l.menuSettings
+        supportMenuItem?.title  = l.menuSupport
         quitMenuItem?.title     = l.menuQuit
         settingsWindow?.title   = l.windowTitle
     }

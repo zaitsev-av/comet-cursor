@@ -140,6 +140,24 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section(l.sectionAbout) {
+                HStack {
+                    Text(l.labelMadeBy)
+                    Spacer()
+                    Text("zaitsev-av")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Version")
+                    Spacer()
+                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
+                        .foregroundStyle(.secondary)
+                }
+                Button(l.labelSupportBtn) {
+                    NSWorkspace.shared.open(URL(string: "https://boosty.to/zaitsev_av")!)
+                }
+                .buttonStyle(.link)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 460)

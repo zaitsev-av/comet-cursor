@@ -17,10 +17,11 @@ struct L10n {
     let lang: AppLanguage
 
     // MARK: - Menu
-    var menuEnabled: String     { s("Enabled",           "Включён") }
-    var menuSettings: String    { s("Settings\u{2026}",  "Настройки\u{2026}") }
-    var menuQuit: String        { s("Quit",              "Выйти") }
-    var windowTitle: String     { s("Comet Cursor — Settings", "Comet Cursor — Настройки") }
+    var menuEnabled: String     { s("Enabled",                    "Включён") }
+    var menuSettings: String    { s("Settings\u{2026}",           "Настройки\u{2026}") }
+    var menuSupport: String     { s("Support on Boosty \u{2197}", "Поддержать на Boosty \u{2197}") }
+    var menuQuit: String        { s("Quit",                       "Выйти") }
+    var windowTitle: String     { s("Comet Cursor — Settings",    "Comet Cursor — Настройки") }
 
     // MARK: - Settings sections
     var sectionPresets: String  { s("Quick Start",    "Быстрый старт") }
@@ -53,6 +54,11 @@ struct L10n {
     var labelCurrentAppUnavailable: String { s("Open another app to add it here.", "Откройте другое приложение, чтобы добавить его сюда.") }
     var labelLaunchAtLoginHint: String { s("Best for menu bar workflows after you sign the app bundle.", "Лучше всего работает после подписи app bundle.") }
     var labelPresenterPositioning: String { s("Built for screen sharing, demos, and recordings.", "Сделано для демонстраций экрана, демо и записей.") }
+
+    // MARK: - About
+    var sectionAbout: String       { s("About",            "О приложении") }
+    var labelMadeBy: String        { s("Made by",          "Автор") }
+    var labelSupportBtn: String    { s("Support on Boosty \u{2197}", "Поддержать на Boosty \u{2197}") }
 
     // MARK: - Dynamic labels
     func fadeSpeedLabel(_ speed: Double) -> String {
