@@ -105,6 +105,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Onboarding
 
     private func showOnboarding() {
+        guard !AXIsProcessTrusted() else {
+            onboardingWindow?.close()
+            onboardingWindow = nil
+            startApp()
+            return
+        }
+
         if let onboardingWindow {
             onboardingWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
