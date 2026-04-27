@@ -6,6 +6,7 @@ struct OnboardingView: View {
     let onComplete: () -> Void
 
     @State private var isGranted = false
+    @State private var hasCompleted = false
     @State private var pollTimer: Timer?
 
     private var l: L10n { settings.l10n }
@@ -118,7 +119,7 @@ struct OnboardingView: View {
     private func startPolling() {
         // Already has permission (re-opened onboarding, or granted before window showed)
         if AXIsProcessTrusted() {
-            handleGranted()
+            completeOnboarding()
             return
         }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
@@ -137,7 +138,14 @@ struct OnboardingView: View {
     private func handleGranted() {
         isGranted = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            onComplete()
+            completeOnboarding()
         }
+    }
+
+    private func completeOnboarding() {
+        guard !hasCompleted else { return }
+        hasCompleted = true
+        stopPolling()
+        onComplete()
     }
 }

@@ -10,8 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var renderers: [CometRenderer] = []
     private var settingsWindow: NSWindow?
+    private var settingsHostingController: NSHostingController<SettingsView>?
     private var onboardingWindow: NSWindow?
-    private var toggleMenuItem: NSMenuItem?
+    private var menuHeaderSwitch: MenuHeaderSwitchButton?
+    private weak var menuHeaderTitleField: NSTextField?
     private var settingsMenuItem: NSMenuItem?
     private var supportMenuItem: NSMenuItem?
     private var quitMenuItem: NSMenuItem?
@@ -19,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appObserverTokens: [NSObjectProtocol] = []
     private var zOrderEnforcerTimer: Timer?
     private var languageCancellable: AnyCancellable?
+    private var enabledCancellable: AnyCancellable?
     private var exclusionCancellable: AnyCancellable?
     private var shortcutCancellable: AnyCancellable?
     private var launchAtLoginCancellable: AnyCancellable?
@@ -46,6 +49,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         NSApp.setActivationPolicy(.accessory)
         setupStatusBar()
+        enabledCancellable = settings.$isEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self, let sw = self.menuHeaderSwitch else { return }
+                if sw.isOn != enabled {
+                    sw.isOn = enabled
+                }
+            }
         languageCancellable = settings.$language
             .dropFirst()
             .receive(on: DispatchQueue.main)
@@ -94,6 +105,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Onboarding
 
     private func showOnboarding() {
+        guard !AXIsProcessTrusted() else {
+            onboardingWindow?.close()
+            onboardingWindow = nil
+            startApp()
+            return
+        }
+
         if let onboardingWindow {
             onboardingWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -148,10 +166,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let l = settings.l10n
 
-        let toggle = NSMenuItem(title: l.menuEnabled, action: #selector(toggleEnabled), keyEquivalent: "")
-        toggle.state = settings.isEnabled ? .on : .off
-        menu.addItem(toggle)
-        toggleMenuItem = toggle
+        let headerItem = NSMenuItem()
+        headerItem.view = makeStatusBarMenuHeaderView(brandTitle: l.settingsHeaderTitle)
+        menu.addItem(headerItem)
 
         menu.addItem(.separator())
         let settingsItem = NSMenuItem(title: l.menuSettings, action: #selector(openSettings), keyEquivalent: ",")
@@ -171,7 +188,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleEnabled() {
         settings.isEnabled.toggle()
-        toggleMenuItem?.state = settings.isEnabled ? .on : .off
+        menuHeaderSwitch?.isOn = settings.isEnabled
+        syncOverlayVisibility()
+    }
+
+    @objc private func menuHeaderSwitchChanged(_ sender: MenuHeaderSwitchButton) {
+        settings.isEnabled = sender.isOn
         syncOverlayVisibility()
     }
 
@@ -183,13 +205,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             let view = SettingsView(settings: settings)
             let controller = NSHostingController(rootView: view)
-            controller.view.frame = CGRect(x: 0, y: 0, width: 460, height: 620)
-            let win = NSWindow(contentViewController: controller)
+            controller.view.translatesAutoresizingMaskIntoConstraints = false
+
+            let effectView = NSVisualEffectView()
+            effectView.material = .sidebar
+            effectView.blendingMode = .behindWindow
+            effectView.state = .active
+            effectView.autoresizingMask = [.width, .height]
+            effectView.addSubview(controller.view)
+            NSLayoutConstraint.activate([
+                controller.view.leadingAnchor.constraint(equalTo: effectView.leadingAnchor),
+                controller.view.trailingAnchor.constraint(equalTo: effectView.trailingAnchor),
+                controller.view.topAnchor.constraint(equalTo: effectView.topAnchor),
+                controller.view.bottomAnchor.constraint(equalTo: effectView.bottomAnchor),
+            ])
+
+            let size = CGSize(width: 460, height: 620)
+            let win = NSWindow(
+                contentRect: NSRect(origin: .zero, size: size),
+                styleMask: [.titled, .closable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            win.contentView = effectView
             win.title = settings.l10n.windowTitle
-            win.styleMask = [.titled, .closable]
+            win.titlebarAppearsTransparent = true
+            win.titleVisibility = .hidden
+            win.isOpaque = false
+            win.backgroundColor = .clear
             win.isReleasedWhenClosed = false
-            win.setContentSize(CGSize(width: 460, height: 620))
+            win.setContentSize(size)
             win.center()
+            settingsHostingController = controller
             settingsWindow = win
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
@@ -198,11 +245,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateMenuTitles() {
         let l = settings.l10n
-        toggleMenuItem?.title   = l.menuEnabled
         settingsMenuItem?.title = l.menuSettings
         supportMenuItem?.title  = l.menuSupport
         quitMenuItem?.title     = l.menuQuit
         settingsWindow?.title   = l.windowTitle
+        menuHeaderTitleField?.stringValue = l.settingsHeaderTitle
+    }
+
+    private func makeStatusBarMenuHeaderView(brandTitle: String) -> NSView {
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 44))
+        let icon = NSImageView()
+        if let img = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Comet Cursor") {
+            icon.image = img
+            icon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        }
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let title = NSTextField(labelWithString: brandTitle)
+        title.font = .systemFont(ofSize: 13, weight: .semibold)
+        title.translatesAutoresizingMaskIntoConstraints = false
+
+        let sw = MenuHeaderSwitchButton()
+        sw.translatesAutoresizingMaskIntoConstraints = false
+        sw.isOn = settings.isEnabled
+        sw.target = self
+        sw.action = #selector(menuHeaderSwitchChanged(_:))
+
+        container.addSubview(icon)
+        container.addSubview(title)
+        container.addSubview(sw)
+
+        NSLayoutConstraint.activate([
+            icon.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+            icon.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 20),
+            icon.heightAnchor.constraint(equalToConstant: 20),
+            title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
+            title.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            sw.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
+            sw.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            sw.widthAnchor.constraint(equalToConstant: 38),
+            sw.heightAnchor.constraint(equalToConstant: 22),
+            title.trailingAnchor.constraint(lessThanOrEqualTo: sw.leadingAnchor, constant: -8),
+        ])
+
+        menuHeaderSwitch = sw
+        menuHeaderTitleField = title
+        return container
     }
 
     // MARK: - Renderers
@@ -361,5 +450,63 @@ extension AppDelegate: NSMenuDelegate {
         DispatchQueue.main.async {
             self.renderers.forEach { $0.orderFront() }
         }
+    }
+}
+
+private final class MenuHeaderSwitchButton: NSButton {
+    var isOn = false {
+        didSet { updateAppearance() }
+    }
+
+    private let knobLayer = CALayer()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        commonInit()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        commonInit()
+    }
+
+    override func layout() {
+        super.layout()
+        updateAppearance()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        isOn.toggle()
+        if let action {
+            NSApp.sendAction(action, to: target, from: self)
+        }
+    }
+
+    private func commonInit() {
+        title = ""
+        isBordered = false
+        wantsLayer = true
+        layer?.masksToBounds = false
+        knobLayer.backgroundColor = NSColor.white.cgColor
+        knobLayer.shadowColor = NSColor.black.cgColor
+        knobLayer.shadowOpacity = 0.18
+        knobLayer.shadowRadius = 2
+        knobLayer.shadowOffset = CGSize(width: 0, height: 1)
+        layer?.addSublayer(knobLayer)
+        setAccessibilityRole(.button)
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+        let bounds = self.bounds
+        let knobDiameter: CGFloat = max(bounds.height - 6, 1)
+        let x = isOn ? bounds.width - knobDiameter - 3 : 3
+
+        layer.cornerRadius = bounds.height / 2
+        layer.backgroundColor = (isOn ? NSColor.systemBlue : NSColor.tertiaryLabelColor).cgColor
+        knobLayer.cornerRadius = knobDiameter / 2
+        knobLayer.frame = CGRect(x: x, y: 3, width: knobDiameter, height: knobDiameter)
+        setAccessibilityValue(isOn ? "On" : "Off")
     }
 }

@@ -22,6 +22,9 @@ struct L10n {
     var menuSupport: String     { s("Support on Boosty \u{2197}", "Поддержать на Boosty \u{2197}") }
     var menuQuit: String        { s("Quit",                       "Выйти") }
     var windowTitle: String     { s("Comet Cursor — Settings",    "Comet Cursor — Настройки") }
+    /// Заголовок окна настроек (glass UI).
+    var settingsHeaderTitle: String { s("Comet Cursor", "Comet Cursor") }
+    var settingsHeaderSubtitle: String { s("Settings", "Настройки") }
 
     // MARK: - Settings sections
     var sectionPresets: String  { s("Quick Start",    "Быстрый старт") }
@@ -58,6 +61,7 @@ struct L10n {
     // MARK: - About
     var sectionAbout: String       { s("About",            "О приложении") }
     var labelMadeBy: String        { s("Made by",          "Автор") }
+    var labelVersion: String       { s("Version",          "Версия") }
     var labelSupportBtn: String    { s("Support on Boosty \u{2197}", "Поддержать на Boosty \u{2197}") }
 
     // MARK: - Dynamic labels

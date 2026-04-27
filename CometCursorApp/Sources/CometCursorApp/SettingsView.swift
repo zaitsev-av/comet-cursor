@@ -7,161 +7,193 @@ struct SettingsView: View {
     private var l: L10n { settings.l10n }
 
     var body: some View {
-        Form {
-            Section(l.sectionPresets) {
-                labeled(l.labelPreset) {
-                    Picker("", selection: presetBinding) {
-                        ForEach(settings.availablePresets) { preset in
-                            Text(preset.title(language: settings.language)).tag(preset.id)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                settingsWindowHeader
+
+                GlassSection(l.sectionPresets) {
+                    labeled(l.labelPreset) {
+                        Picker("", selection: presetBinding) {
+                            ForEach(settings.availablePresets) { preset in
+                                Text(preset.title(language: settings.language)).tag(preset.id)
+                            }
+                            Text(l.labelCustomPreset).tag(CursorPresetLibrary.customID)
                         }
-                        Text(l.labelCustomPreset).tag(CursorPresetLibrary.customID)
+                        .labelsHidden()
                     }
-                    .labelsHidden()
-                }
 
-                labeled(l.labelStyle) {
-                    Picker("", selection: $settings.renderStyle) {
-                        ForEach(CursorRenderStyle.allCases) { style in
-                            Text(style.displayName(language: settings.language)).tag(style)
+                    labeled(l.labelStyle) {
+                        Picker("", selection: $settings.renderStyle) {
+                            ForEach(CursorRenderStyle.allCases) { style in
+                                Text(style.displayName(language: settings.language)).tag(style)
+                            }
                         }
+                        .labelsHidden()
                     }
-                    .labelsHidden()
-                }
 
-                Text(l.labelPresetHint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(l.sectionTrail) {
-                labeled(l.labelLength) {
-                    Slider(value: $settings.trailLength, in: 20...200, step: 1)
-                    Text("\(Int(settings.trailLength))").monoframe(35)
-                }
-                labeled(l.labelWidth) {
-                    Slider(value: $settings.lineWidth, in: 2...80, step: 1)
-                    Text("\(Int(settings.lineWidth)) pt").monoframe(45)
-                }
-                labeled(l.labelOpacity) {
-                    Slider(value: $settings.opacity, in: 0.1...1.0)
-                    Text("\(Int(settings.opacity * 100))%").monoframe(45)
-                }
-            }
-
-            Section(l.sectionFade) {
-                labeled(l.labelSpeed) {
-                    Slider(value: $settings.fadeSpeed, in: 0.2...3.0)
-                    Text(l.fadeSpeedLabel(settings.fadeSpeed)).monoframe(60)
-                }
-                labeled(l.labelDelay) {
-                    Slider(value: $settings.fadeDelay, in: 0.0...2.0)
-                    Text(l.fadeDelayLabel(settings.fadeDelay)).monoframe(60)
-                }
-            }
-
-            Section(l.sectionColors) {
-                ColorPicker(l.labelTailColor, selection: tailColorBinding)
-                ColorPicker(l.labelHeadColor, selection: headColorBinding)
-            }
-
-            Section(l.sectionControl) {
-                Toggle(l.labelShortcut, isOn: $settings.globalShortcutEnabled)
-                if settings.globalShortcutEnabled {
-                    Text("\(HotkeyManager.shared.shortcutDisplayString) — \(l.labelShortcutHint)")
+                    Text(l.labelPresetHint)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
-                Toggle(l.labelLoginItem, isOn: $settings.launchAtLogin)
-                if !settings.launchAtLoginStatus.isEmpty {
-                    Text(settings.launchAtLoginStatus)
+                GlassSection(l.sectionTrail) {
+                    labeled(l.labelLength) {
+                        GlassSlider(value: $settings.trailLength, in: 20...200, step: 1)
+                        Text("\(Int(settings.trailLength))").monoframe(35)
+                    }
+                    labeled(l.labelWidth) {
+                        GlassSlider(value: $settings.lineWidth, in: 2...80, step: 1)
+                        Text("\(Int(settings.lineWidth)) pt").monoframe(45)
+                    }
+                    labeled(l.labelOpacity) {
+                        GlassSlider(value: $settings.opacity, in: 0.1...1.0)
+                        Text("\(Int(settings.opacity * 100))%").monoframe(45)
+                    }
+                }
+
+                GlassSection(l.sectionFade) {
+                    labeled(l.labelSpeed) {
+                        GlassSlider(value: $settings.fadeSpeed, in: 0.2...3.0)
+                        Text(l.fadeSpeedLabel(settings.fadeSpeed)).monoframe(60)
+                    }
+                    labeled(l.labelDelay) {
+                        GlassSlider(value: $settings.fadeDelay, in: 0.0...2.0)
+                        Text(l.fadeDelayLabel(settings.fadeDelay)).monoframe(60)
+                    }
+                }
+
+                GlassSection(l.sectionColors) {
+                    ColorPicker(l.labelTailColor, selection: tailColorBinding)
+                    ColorPicker(l.labelHeadColor, selection: headColorBinding)
+                }
+
+                GlassSection(l.sectionControl) {
+                    Toggle(l.labelShortcut, isOn: $settings.globalShortcutEnabled)
+                    if settings.globalShortcutEnabled {
+                        Text("\(HotkeyManager.shared.shortcutDisplayString) — \(l.labelShortcutHint)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Toggle(l.labelLoginItem, isOn: $settings.launchAtLogin)
+                    if !settings.launchAtLoginStatus.isEmpty {
+                        Text(settings.launchAtLoginStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(l.labelLaunchAtLoginHint)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text(l.labelLaunchAtLoginHint)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-
-            Section(l.sectionApp) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text(l.labelCurrentApp)
-                        Spacer()
-                        Text(currentAppTitle)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Button(l.labelAddCurrentApp, action: addCurrentApp)
-                        .disabled(!canAddCurrentApp)
-
-                    if !canAddCurrentApp {
-                        Text(l.labelCurrentAppUnavailable)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                        .foregroundStyle(.tertiary)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(l.labelExcludedApps)
-                    if settings.excludedApps.isEmpty {
-                        Text(l.labelNoExcludedApps)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(settings.excludedApps) { app in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(app.displayName)
-                                    Text(app.bundleID)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                GlassSection(l.sectionApp) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text(l.labelCurrentApp)
+                            Spacer()
+                            Text(currentAppTitle)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Button(l.labelAddCurrentApp, action: addCurrentApp)
+                            .disabled(!canAddCurrentApp)
+
+                        if !canAddCurrentApp {
+                            Text(l.labelCurrentAppUnavailable)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(l.labelExcludedApps)
+                        if settings.excludedApps.isEmpty {
+                            Text(l.labelNoExcludedApps)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(settings.excludedApps) { app in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(app.displayName)
+                                        Text(app.bundleID)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        settings.removeExcludedApp(bundleID: app.bundleID)
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                Spacer()
-                                Button(role: .destructive) {
-                                    settings.removeExcludedApp(bundleID: app.bundleID)
-                                } label: {
-                                    Image(systemName: "minus.circle")
-                                }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
-                }
 
-                Picker(l.labelLanguage, selection: $settings.language) {
-                    ForEach(AppLanguage.allCases) { lang in
-                        Text(lang.displayName).tag(lang)
+                    Picker(l.labelLanguage, selection: $settings.language) {
+                        ForEach(AppLanguage.allCases) { lang in
+                            Text(lang.displayName).tag(lang)
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
+                    .pickerStyle(.segmented)
 
-                Text(l.labelPresenterPositioning)
-                    .font(.caption)
+                    Text(l.labelPresenterPositioning)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                GlassSection(l.sectionAbout) {
+                    HStack {
+                        Text(l.labelMadeBy)
+                        Spacer()
+                        Text("zaitsev-av")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text(l.labelVersion)
+                        Spacer()
+                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
+                            .foregroundStyle(.secondary)
+                    }
+                    Button(l.labelSupportBtn) {
+                        NSWorkspace.shared.open(URL(string: "https://boosty.to/zaitsev_av")!)
+                    }
+                    .buttonStyle(.link)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+        }
+        .frame(width: 460)
+        .background(Color.clear)
+    }
+
+    private var settingsWindowHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(nsColor: settings.headColor), Color(nsColor: settings.tailColor)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 36, height: 36)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.settingsHeaderTitle)
+                    .font(.title2.bold())
+                Text(l.settingsHeaderSubtitle)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            Section(l.sectionAbout) {
-                HStack {
-                    Text(l.labelMadeBy)
-                    Spacer()
-                    Text("zaitsev-av")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
-                        .foregroundStyle(.secondary)
-                }
-                Button(l.labelSupportBtn) {
-                    NSWorkspace.shared.open(URL(string: "https://boosty.to/zaitsev_av")!)
-                }
-                .buttonStyle(.link)
-            }
+            Spacer(minLength: 0)
         }
-        .formStyle(.grouped)
-        .frame(width: 460)
-        .padding(.bottom, 8)
+        .padding(.vertical, 4)
     }
 
     private var presetBinding: Binding<String> {
