@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindow: NSWindow?
     private var menuHeaderSwitch: MenuHeaderSwitchButton?
     private weak var menuHeaderTitleField: NSTextField?
+    private var permissionHintMenuItem: NSMenuItem?
     private var settingsMenuItem: NSMenuItem?
     private var supportMenuItem: NSMenuItem?
     private var quitMenuItem: NSMenuItem?
@@ -95,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        if AXIsProcessTrusted() {
+        if AXIsProcessTrusted() || settings.hasSeenOnboarding {
             startApp()
         } else {
             showOnboarding()
@@ -119,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let view = OnboardingView(settings: settings) { [weak self] in
+            self?.settings.hasSeenOnboarding = true
             self?.onboardingWindow?.close()
             self?.onboardingWindow = nil
             self?.startApp()
@@ -171,6 +173,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(headerItem)
 
         menu.addItem(.separator())
+        let hintItem = NSMenuItem(title: l.menuPermissionHint, action: #selector(openAccessibilitySettings), keyEquivalent: "")
+        hintItem.attributedTitle = permissionHintAttributedTitle(l.menuPermissionHint)
+        hintItem.isHidden = AXIsProcessTrusted()
+        menu.addItem(hintItem)
+        permissionHintMenuItem = hintItem
+
         let settingsItem = NSMenuItem(title: l.menuSettings, action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(settingsItem)
         settingsMenuItem = settingsItem
@@ -195,6 +203,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func menuHeaderSwitchChanged(_ sender: MenuHeaderSwitchButton) {
         settings.isEnabled = sender.isOn
         syncOverlayVisibility()
+    }
+
+    @objc private func openAccessibilitySettings() {
+        NSWorkspace.shared.open(
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        )
+    }
+
+    private func permissionHintAttributedTitle(_ title: String) -> NSAttributedString {
+        let attachment = NSTextAttachment()
+        attachment.image = NSImage(systemSymbolName: "sparkle", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .regular))
+        let icon = NSMutableAttributedString(attachment: attachment)
+        icon.addAttribute(.foregroundColor, value: NSColor.systemOrange, range: NSRange(location: 0, length: icon.length))
+        let text = NSMutableAttributedString(string: "  " + title, attributes: [
+            .font: NSFont.systemFont(ofSize: 13),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ])
+        icon.append(text)
+        return icon
     }
 
     @objc private func openBoosty() {
@@ -443,6 +471,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         renderers.forEach { $0.orderFront() }
+        permissionHintMenuItem?.isHidden = AXIsProcessTrusted()
     }
 
     func menuDidClose(_ menu: NSMenu) {

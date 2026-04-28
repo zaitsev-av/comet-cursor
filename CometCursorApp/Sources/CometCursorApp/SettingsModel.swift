@@ -175,6 +175,9 @@ final class SettingsModel: ObservableObject {
     @Published var excludedApps: [AppExclusion] {
         didSet { saveExcludedApps(excludedApps) }
     }
+    @Published var hasSeenOnboarding: Bool {
+        didSet { UserDefaults.standard.set(hasSeenOnboarding, forKey: "hasSeenOnboarding") }
+    }
     @Published var activeAppName: String = ""
     @Published var activeAppBundleID: String = ""
     @Published var launchAtLoginStatus: String = ""
@@ -184,6 +187,7 @@ final class SettingsModel: ObservableObject {
         language = AppLanguage(rawValue: rawLang) ?? .en
         isEnabled = ud.boolOrDefault(key: "isEnabled", default: true)
         selectedPresetID = ud.string(forKey: "selectedPresetID") ?? "presenter"
+        hasSeenOnboarding = ud.boolOrDefault(key: "hasSeenOnboarding", default: false)
         renderStyle = CursorRenderStyle(rawValue: ud.string(forKey: "renderStyle") ?? CursorRenderStyle.comet.rawValue) ?? .comet
         trailLength = ud.doubleOrDefault(key: "trailLength", default: 80)
         lineWidth = ud.doubleOrDefault(key: "lineWidth", default: 12)
