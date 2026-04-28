@@ -92,6 +92,12 @@ struct L10n {
     var onboardingGranted: String     { s("Access granted — you're ready to present.", "Доступ получен — можно показывать экран.") }
     var onboardingSkip: String        { s("Continue without access", "Продолжить без доступа") }
 
+    // MARK: - Menu permission hint
+    var menuPermissionHint: String { s(
+        "Enable Accessibility for smoother tracking\u{2026}",
+        "Включить Accessibility для точности\u{2026}"
+    ) }
+
     // MARK: - Accessibility error (fallback alert)
     var accessibilityAlertTitle: String { s("Accessibility Permission Required", "Необходимо разрешение Accessibility") }
     var accessibilityAlertBody: String  { s(
